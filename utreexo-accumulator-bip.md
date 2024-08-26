@@ -20,14 +20,36 @@ possible in O(log2N).
 
 # Specification
 
+- The Utreexo accumulator state is comprised of 2 fields:
+  - `roots` refers to the roots of the merkle trees. Represented as 32 byte arrays.
+  - `numleaves` refers to the number of total leaves added to the accumulator. Represented as uint64 field.
+
+The accumulator state implemented in python:
+
+```
+class Stump:
+    def __init__(self):
+        self.numleaves = 0
+        self.roots = []
+```
+
+- `hash` refers to a vector of 32 byte arrays.
 - `[]leaf` refers to a vector of 32 byte arrays that are to be added to the accumulator.
 - `acc` refers to the Utreexo accumulator state.
 - `parent_hash` is the concatenation and hash of two child hashes. If either of the child hashes are nil, the returned result is just the non-nil child by itself.
 - The hash function SHA512/256[^2] is used for the hash operations in the accumulator.
-- The Utreexo accumulator state is comprised of 2 fields:
-  - `roots` refers to the roots of the merkle trees. Represented as 32 byte arrays.
-  - `numleaves` refers to the number of total leaves added to the accumulator. Represented as uint64 field.
 - `treerows` is a function that returns the popcount of `numleaves` in the accumulator state. 0 if `numleaves` is 0.
+- `parent(position, numleaves)` is a function that returns the parent position of the given position in an accumulator with leaf count of `numleaves`.
+- `root_position(numleaves, row, total_rows)` is a function that returns the position of the root at the given row.
+Will return a garbage value if there's no root at the row.
+- `root_present(numleaves, row)` returns if there's a root at the given row in an accumulator with leaf count of `numleaves`.
+- `detect_row(position, total_rows)` is a function that returns which row the given position is at in an accumulator with row count of `total_rows`.
+- `isroot(position, numleaves, total_rows)` returns if the position is a root in an accumulator with leaf count of `numleaves` and a row count of `total_rows`.
+- `is_right_sibling(position)` returns true if the position is on the right side.
+- `right_sibling(position)` returns the position of the sibling on the right side. Returns itself if the position is on the right.
+- `root_idx(numleaves, position)` returns the index of the root in the accumulator state that will be modified when deleting position.
+- `getrootidxs(numleaves, positions)` returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions.
+Returned indexes are in descending order.
 
 An Utreexo accumulator implementation MUST support these 3 operations: Add, Verify, and Delete.
 
@@ -92,16 +114,28 @@ The new accumulator will look like so:
 00  01  02  03  04  05  06  07  08
 ```
 
+The new accumulator with all the positions:
+
+```
+30
+|-------------------------------\
+28                              29
+|---------------\               |---------------\
+24              25              26              27
+|-------\       |-------\       |-------\       |-------\
+16      17      18      19      20      21      22      23
+|---\   |---\   |---\   |---\   |---\   |---\   |---\   |---\
+00  01  02  03  04  05  06  07  08  09  10  11  12  13  14  15
+```
+
 ## Addition
 
-Addition adds leaves to the accumulator. The added leaves are able to be verified of their
+Addition adds a leaf to the accumulator. The added leaves are able to be verified of their
 existance with an inclusion proof.
 
-The Addition algorithm Add(`acc`, `[]leaves`) is defined as:
+The Addition algorithm Add(`acc`, `leaf`) is defined as:
 
-For each leaf in the vector:
-
-- From row 0 to `treerows(acc.numleaves)`
+- From row 0 to and including `treerows(acc.numleaves)`
   - Break if there's no root at this row.
   - `parent_hash` existing root at row with `leaf`.
   - Make the result from `parent_hash` the new `leaf`.
@@ -111,28 +145,21 @@ For each leaf in the vector:
 The algorithm implemented in python:
 
 ```
-class Stump:
-    def __init__(self):
-        self.numleaves = 0
-        self.roots = []
+def add(acc: Stump, add: bytes):
+    for row in range(tree_rows(acc.numleaves)+1):
+        if not root_present(acc.numleaves, row): break
+        root = acc.roots.pop()
+        add = parent_hash(root, add)
 
-def add(acc: Stump, leaves: [bytes]):
-    for leaf in leaves:
-        for row in range(tree_rows(acc.numleaves)+1):
-            if (acc.numleaves >> row) & 1 == 0:
-                break
-            root = acc.roots.pop()
-            leaf = parent_hash(root, leaf)
-
-        acc.roots.append(leaf)
-        acc.numleaves += 1
+    acc.roots.append(add)
+    acc.numleaves += 1
 ```
 
 ## Proof
 
 - proof is an inclusion proof for elements in the accumulator. It's comprised of two fields:
   - `targets` are the positions of the elements being proven. Represented as a `[]uint64`.
-  - `proof` are the hashes needed to hash the roots. Represented as a `[]uint64`.
+  - `proof` are the hashes needed to hash the roots. Represented as a `[]hash`.
 
 - `proof.proof` must be in ascending order. The proof is considered invalid otherwise.
 
@@ -140,116 +167,105 @@ def add(acc: Stump, leaves: [bytes]):
 
 Both the Verification and Deletion operations depend on the Calculate Roots function.
 
-The calculate roots algorithm is defined as CalculateRoots(`numleaves`, `[]hashes`, `proof`) -> `modified_roots`.
+The calculate roots algorithm is defined as CalculateRoots(`numleaves`, `[]hashes`, `proof`) -> `calculated_roots`.
 The passed in `[]hashes` and `proof.targets` should be in the same order.
-The element at index 0 in []hashes should be the hash for element at index 0 in `proof.targets`.
+The element at index i in []hashes should be the hash for element at index i in `proof.targets`.
 
 - Check if length of `proof.targets` is equal to the length of `[]hashes`. Return early if they're not equal.
 - map proof.targets to their hashes
 - Sort proof.targets
 - Loop until proof.targets are empty:
-  - Pop off first target in proof.targets.
-  - If the the target is a root, we append to the `modified_roots` vector and continue.
+  - Pop off the first target in proof.targets. Pop off the associated hash as well.
+  - If the the target is a root, we append to the `calculated_roots` vector and continue.
   - Grab sibling hash to hash with. It'e either in proof.targets or proof.proof.
   - Figure out if the sibling hash is on the left or the right.
   - Apply `parent_hash` to the target hash and the sibling hash.
   - Calculate parent position.
   - parent position is inserted into the sorted proof.targets.
-  - `parent_hash` is mapped to the parent position.
+  - parent hash is mapped to the parent position.
 
-- Return modified_roots
+- Return calculated_roots
 
 The algorithm implemented in python:
 
 ```
 def calculate_roots(numleaves: int, dels: [bytes], proof: Proof) -> [bytes]:
-    if not proof.targets:
-        return []
+    if not proof.targets: return []
+    if len(proof.targets) != len(dels): return []
+
+    position_hashes = {}
+    for i, target in enumerate(proof.targets):
+        position_hashes[target] = None if dels is None else dels[i]
 
     calculated_roots = []
-
-    posHash = {}
-    for i, target in enumerate(proof.targets):
-        if dels is None:
-            posHash[target] = None
-        else:
-            posHash[target] = dels[i]
-
     sortedTargets = sorted(proof.targets)
     while sortedTargets:
         pos = sortedTargets.pop(0)
-        cur_hash = posHash[pos]
-        del posHash[pos]
+        cur_hash = position_hashes.pop(pos)
 
         if isroot(pos, numleaves, tree_rows(numleaves)):
             calculated_roots.append(cur_hash)
             continue
 
-        parent_pos = parent(pos, tree_rows(numleaves))
-        bisect.insort(sortedTargets, parent_pos)
-
-        if sortedTargets and pos | 1 == sortedTargets[0]:
+        parent_pos, p_hash = parent(pos, tree_rows(numleaves)), bytes
+        if sortedTargets and right_sibling(pos) == sortedTargets[0]:
             sib_pos = sortedTargets.pop(0)
-            posHash[parent_pos] = parent_hash(cur_hash, posHash[sib_pos])
-
-            del posHash[sib_pos]
+            p_hash = parent_hash(cur_hash, position_hashes.pop(sib_pos))
         else:
             proofhash = proof.proof.pop(0)
+            p_hash = parent_hash(proofhash, cur_hash) if is_right_sibling(pos) else parent_hash(cur_hash, proofhash)
 
-            if pos & 1 == 0:
-                posHash[parent_pos] = parent_hash(cur_hash, proofhash)
-            else:
-                posHash[parent_pos] = parent_hash(proofhash, cur_hash)
+        position_hashes[parent_pos] = p_hash
+        bisect.insort(sortedTargets, parent_pos)
 
     return calculated_roots
 ```
 
 ## Verification
 
-The Verification algorithm Verify(`acc`, `[]hashes`, `proof`) -> ([]int, bool) is defined as:
+The Verification algorithm Verify(`acc`, `[]hashes`, `proof`) is defined as:
 
-- Get `modified_roots` from `CalculateRoots(acc.numleaves, []hashes, Proof)`
+- Raise error if length of `[]hashes` differ from `proof.targets`.
+- Get `modified_roots` from `CalculateRoots(acc.numleaves, []hashes, Proof)`.
+- Get `root_idxs` from `getrootidxs`.
+- Raise error if the length of `modified_roots` and `root_idxs` do not match.
 - Attempt to match roots in `modified_roots` with roots in `acc`. Raise error if we don't find all the roots in the `modified_roots` in `acc`.
-- Return indexes of the changed modified roots.
+
+The algorithm implemented in python:
 
 ```
-def verify(acc: Stump, dels: [bytes], proof: Proof) -> [int]:
+def verify(acc: Stump, dels: [bytes], proof: Proof):
     if len(dels) != len(proof.targets):
         raise("len of dels and proof.targets differ")
 
     root_candidates = calculate_roots(acc.numleaves, dels, proof)
+    root_idxs = getrootidxs(acc.numleaves, proof.targets)
 
-    root_idxs = []
-    for i in range(len(acc.roots)):
-        j = len(acc.roots) - (i+1)
-        if len(root_candidates) > len(root_idxs):
-            if acc.roots[j] == root_candidates[len(root_idxs)]:
-                root_idxs.append(j)
+    if len(root_candidates) != len(root_idxs):
+        raise("length of calculated roots from the proof and expected root count differ")
 
-    if len(root_idxs) != len(root_candidates):
-        raise("calculated roots from the proof and matched roots differ")
-
-    return root_idxs
+    for i, idx in enumerate(root_idxs):
+        if acc.roots[idx] != root_candidates[i]:
+            raise("calculated roots from the proof and matched roots differ")
 ```
 
 ## Deletion
 
-Deletion removes leaves from the accumulator. The leaves no longer exist in the accumulator.
+Deletion removes leaves from the accumulator. The deletion algorithm takes in a `proof` but it does not
+verify that the proof is valid. It assumes that the passed in proof has already passed verification.
 
-The Deletion algorithm Delete(`acc`, `[]positions`, `Proof`) -> `acc` is defined as:
+The Deletion algorithm Delete(`acc`, `Proof`) -> `acc` is defined as:
 
-- Get `root_idx` from `Verify(acc, []positions, Proof)`. Raise error if `Verify` fails.
+- Get the modified indexes of the roots `root_idxes` from `getrootidxs`.
 - Get `modified_roots` from `Calculate_Roots(acc.numleaves, []positions, Proof)`.
-- Replace the matching indexes from the `root_idx` in `acc.roots` with `modified_roots`.
+- Replace the matching indexes from the `root_idxes` in `acc.roots` with `modified_roots`.
+
+The algorithm implemented in python:
 
 ```
-def delete(acc: Stump, dels: [bytes], proof: Proof):
-    dels_copy = dels.copy()
-    proof_copy = copy.copy(proof)
-    root_idxs = acc.verify(dels_copy, proof_copy)
-
+def delete(acc: Stump, proof: Proof):
     modified_roots = calculate_roots(acc.numleaves, None, proof)
-
+    root_idxs = getrootidxs(acc.numleaves, proof.targets)
     for i, idx in enumerate(root_idxs):
         acc.roots[idx] = modified_roots[i]
 ```
