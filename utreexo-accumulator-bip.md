@@ -21,15 +21,15 @@ possible in O(log2N).
 # Definitions
 
 - `hash` refers to a vector of 32 byte arrays.
-- `[]leaf` refers to a vector of 32 byte arrays that are to be added to the accumulator.
+- `[]hash` refers to a vector of `hash`.
 - `acc` refers to the Utreexo accumulator state.
 - The hash function SHA512/256[^2] is used for the hash operations in the accumulator.
 
 # Specification
 
 - The Utreexo accumulator state is comprised of 2 fields:
-  - `roots` refers to the roots of the merkle trees. Represented as 32 byte arrays.
-  - `numleaves` refers to the number of total leaves added to the accumulator. Represented as uint64 field.
+  - `roots` refers to the roots of the merkle trees. Represented as `[]hash`.
+  - `numleaves` refers to the number of total leaves added to the accumulator. Represented as uint64.
 
 The accumulator state implemented in python:
 
@@ -43,28 +43,40 @@ class Stump:
 - `parent_hash(left, right)` is the concatenation and hash of two child hashes. If either of the child hashes are nil, the returned result is just the non-nil child by itself.
 - `treerows(numleaves)` is a function that returns the popcount[^3] of `numleaves`-1. Returns 0 if `numleaves` is 0.
 - `parent(position, total_rows)` is a function that returns the parent position of the given position in an accumulator with leaf count of `numleaves`.
-  - (position >> 1) | (1 << total_rows)
+  ```
+  (position >> 1) | (1 << total_rows)
+  ```
 - `root_position(numleaves, row, total_rows)` is a function that returns the position of the root at the given row. Will return a garbage value if there's no root at the row.
-  - mask = (2 << total_rows) - 1
-  - before = numleaves & (mask << (row + 1))
-  - shifted = (before >> row) | (mask << (total_rows + 1 - row))
-  - shifted & mask
+  ```
+  mask = (2 << total_rows) - 1
+  before = numleaves & (mask << (row + 1))
+  shifted = (before >> row) | (mask << (total_rows + 1 - row))
+  shifted & mask
+  ```
 - `root_present(numleaves, row)` returns if there's a root at the given row in an accumulator with leaf count of `numleaves`.
   - numleaves & (1 << row) != 0
 - `detect_row(position, total_rows)` is a function that returns which row the given position is at in an accumulator with row count of `total_rows`.
-  - marker = 1 << total_rows
-  - h = 0
-  - while position & marker != 0:
-  -     marker >>= 1
-  -     h += 1
-  - h
+  ```
+  marker = 1 << total_rows
+  h = 0
+  while position & marker != 0:
+      marker >>= 1
+      h += 1
+  h
+  ```
 - `isroot(position, numleaves, total_rows)` returns if the position is a root in an accumulator with leaf count of `numleaves` and a row count of `total_rows`.
-  - row = detect_row(position, total_rows)
-  - root_present(numleaves, row) && position == root_position(numleaves, row, total_rows)
+  ```
+  row = detect_row(position, total_rows)
+  root_present(numleaves, row) && position == root_position(numleaves, row, total_rows)
+  ```
 - `is_right_sibling(position)` returns true if the position is on the right side.
-  - position & 1 == 1
+  ```
+  position & 1 == 1
+  ```
 - `right_sibling(position)` returns the position of the sibling on the right side. Returns itself if the position is on the right.
-  - position | 1
+  ```
+  position | 1
+  ```
 - `root_idx(numleaves, position)` returns the index of the root in the accumulator state that will be modified when deleting position.
 - `getrootidxs(numleaves, positions)` returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions.
 Returned indexes are in descending order.
@@ -155,32 +167,32 @@ existance with an inclusion proof.
   - The utreexo accumulator state.
   - 32 byte array to be added.
 
-The Addition algorithm Add(`acc`, `leaf`) is defined as:
+The Addition algorithm Add(`acc`, `hash`) is defined as:
 
 - From row 0 to and including `treerows(acc.numleaves)`
   - Break if there's no root at this row.
-  - `parent_hash` existing root at row with `leaf`.
-  - Make the result from `parent_hash` the new `leaf`.
+  - `parent_hash` existing root at row with `hash`.
+  - Make the result from `parent_hash` the new `hash`.
 - Increment `acc.numleaves` by 1.
-- Append `leaf` to `acc.roots`.
+- Append `hash` to `acc.roots`.
 
 The algorithm implemented in python:
 
 ```
-def add(acc: Stump, add: bytes):
+def add(acc: Stump, hash: bytes):
     for row in range(tree_rows(acc.numleaves)+1):
         if not root_present(acc.numleaves, row): break
         root = acc.roots.pop()
-        add = parent_hash(root, add)
+        hash = parent_hash(root, hash)
 
-    acc.roots.append(add)
+    acc.roots.append(hash)
     acc.numleaves += 1
 ```
 
 ## Proof
 
 - proof is an inclusion proof for elements in the accumulator. It's comprised of two fields:
-  - `targets` are the positions of the elements being proven. Represented as a `[]uint64`.
+  - `targets` are the positions of the elements being proven. Represented as a vector of uint64.
   - `proof` are the hashes needed to hash the roots. Represented as a `[]hash`.
 
 - `proof.proof` must be in ascending order. The proof is considered invalid otherwise.
@@ -206,11 +218,11 @@ Both the Verification and Deletion operations depend on the Calculate Roots func
 The passed in `[]hash` and `proof.targets` should be in the same order. The element at index i in []hashes should
 be the hash for element at index i in `proof.targets`. Otherwise the returned `calculated_roots` will be invalid.
 
-The calculate roots algorithm is defined as CalculateRoots(`numleaves`, `[]hashes`, `proof`) -> `calculated_roots`:
+The calculate roots algorithm is defined as CalculateRoots(`numleaves`, `[]hash`, `proof`) -> `calculated_roots`:
 
-- Check if length of `proof.targets` is equal to the length of `[]hashes`. Return early if they're not equal.
-- map proof.targets to their hashes
-- Sort proof.targets
+- Check if length of `proof.targets` is equal to the length of `[]hash`. Return early if they're not equal.
+- map proof.targets to their hash.
+- Sort proof.targets.
 - Loop until proof.targets are empty:
   - Pop off the first target in proof.targets. Pop off the associated hash as well.
   - If the the target is a root, we append to the `calculated_roots` vector and continue.
