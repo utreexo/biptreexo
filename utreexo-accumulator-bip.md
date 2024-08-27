@@ -43,45 +43,55 @@ class Stump:
 The following utility functions are required for the accumulator operations:
 
 `parent_hash(left, right)` is the concatenation and hash of two child hashes. If either of the child hashes are nil, the returned result is just the non-nil child by itself.
+
 `treerows(numleaves)` is a function that returns the minimum number of bits needed to represent of `numleaves`-1. Returns 0 if `numleaves` is 0.
+
 `parent(position, total_rows)` is a function that returns the parent position of the given position in an accumulator with leaf count of `numleaves`.
-  ```
-  (position >> 1) | (1 << total_rows)
-  ```
+```
+(position >> 1) | (1 << total_rows)
+```
+
 `root_position(numleaves, row, total_rows)` is a function that returns the position of the root at the given row. Will return a garbage value if there's no root at the row.
-  ```
-  mask = (2 << total_rows) - 1
-  before = numleaves & (mask << (row + 1))
-  shifted = (before >> row) | (mask << (total_rows + 1 - row))
-  shifted & mask
-  ```
+```
+mask = (2 << total_rows) - 1
+before = numleaves & (mask << (row + 1))
+shifted = (before >> row) | (mask << (total_rows + 1 - row))
+shifted & mask
+```
+
 `root_present(numleaves, row)` returns if there's a root at the given row in an accumulator with leaf count of `numleaves`.
-  ```
-  numleaves & (1 << row) != 0
-  ```
+```
+numleaves & (1 << row) != 0
+```
+
 `detect_row(position, total_rows)` is a function that returns which row the given position is at in an accumulator with row count of total_rows.
-  ```
-  marker = 1 << total_rows
-  h = 0
-  while position & marker != 0:
-      marker >>= 1
-      h += 1
-  h
-  ```
+```
+marker = 1 << total_rows
+h = 0
+while position & marker != 0:
+    marker >>= 1
+    h += 1
+h
+```
+
 `isroot(position, numleaves, total_rows)` returns if the position is a root in an accumulator with leaf count of `numleaves` and a row count of `total_rows`.
-  ```
-  row = detect_row(position, total_rows)
-  root_present(numleaves, row) && position == root_position(numleaves, row, total_rows)
-  ```
+```
+row = detect_row(position, total_rows)
+root_present(numleaves, row) && position == root_position(numleaves, row, total_rows)
+```
+
 `is_right_sibling(position)` returns true if the position is on the right side.
-  ```
-  position & 1 == 1
-  ```
+```
+position & 1 == 1
+```
+
 `right_sibling(position)` returns the position of the sibling on the right side. Returns itself if the position is on the right.
-  ```
-  position | 1
-  ```
+```
+position | 1
+```
+
 `root_idx(numleaves, position)` returns the index of the root in the accumulator state that will be modified when deleting position.
+
 `getrootidxs(numleaves, positions)` returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions. Returned indexes are in descending order.
 
 An Utreexo accumulator implementation MUST support these 3 operations: Add, Verify, and Delete.
