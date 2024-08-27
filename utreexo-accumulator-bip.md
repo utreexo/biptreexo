@@ -346,6 +346,8 @@ def delete(acc: Stump, proof: Proof):
 
 # Reference Implementations
 
-In Python - github.com/utreexo/pytreexo
-In Rust - github.com/mit-dci/rustreexo
-In Go - github.com/utreexo/utreexo
+In Python - https://github.com/utreexo/pytreexo
+
+In Rust - https://github.com/mit-dci/rustreexo
+
+In Go - https://github.com/utreexo/utreexo
