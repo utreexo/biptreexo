@@ -117,6 +117,10 @@ The following utility functions are required for the accumulator operations:
 
 *treerows(numleaves)* is a function that returns the minimum number of bits needed to represent of `numleaves`-1. Returns 0 if `numleaves` is 0.
 
+*is_right_sibling(position)* returns boolean true if the given position is on the right side. Position is on the right side if the least significant bit is turned on.
+
+*right_sibling(position)* returns the position of the sibling on the right side. It returns the given position if the position is already on the right side. Turning on the least significant bit returns the position on the right side.
+
 *parent(position, total_rows)* is a function that returns the parent position of the given position in an accumulator with leaf count of `numleaves`.
 ```
 (position >> 1) | (1 << total_rows)
@@ -146,16 +150,6 @@ for row in range(total_rows, -1, -1):
 ```
 row = detect_row(position, total_rows)
 root_present(numleaves, row) && position == root_position(numleaves, row, total_rows)
-```
-
-*is_right_sibling(position)* returns true if the position is on the right side.
-```
-position & 1 == 1
-```
-
-*right_sibling(position)* returns the position of the sibling on the right side. Returns itself if the position is on the right.
-```
-position | 1
 ```
 
 *getrootidxs(numleaves, positions)* returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions. Returned indexes are in descending order.
