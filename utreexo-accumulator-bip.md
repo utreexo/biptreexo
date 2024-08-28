@@ -23,35 +23,27 @@ possible in O(log2N).
 - `hash` refers to a vector of 32 byte arrays.
 - `[]hash` refers to a vector of `hash`.
 - `acc` refers to the Utreexo accumulator state.
-- The hash function SHA512/256[^2] is used for the hash operations in the accumulator.
 
 # Specification
 
-- The Utreexo accumulator state is comprised of 2 fields:
+The hash function SHA512/256[^2] is used for the hash operations in the accumulator.
+
+The Utreexo accumulator state is comprised of 2 fields:
   - `roots` refers to the roots of the merkle trees. Represented as `[]hash`.
   - `numleaves` refers to the number of total leaves added to the accumulator. Represented as uint64.
 
-The accumulator state implemented in python:
-
-```
-class Stump:
-    def __init__(self):
-        self.numleaves = 0
-        self.roots = []
-```
-
 The following utility functions are required for the accumulator operations:
 
-`parent_hash(left, right)` is the concatenation and hash of two child hashes. If either of the child hashes are nil, the returned result is just the non-nil child by itself.
+*parent_hash(left, right)* is the concatenation and hash of two child hashes. If either of the child hashes are nil, the returned result is just the non-nil child by itself.
 
-`treerows(numleaves)` is a function that returns the minimum number of bits needed to represent of `numleaves`-1. Returns 0 if `numleaves` is 0.
+*treerows(numleaves)* is a function that returns the minimum number of bits needed to represent of `numleaves`-1. Returns 0 if `numleaves` is 0.
 
-`parent(position, total_rows)` is a function that returns the parent position of the given position in an accumulator with leaf count of `numleaves`.
+*parent(position, total_rows)* is a function that returns the parent position of the given position in an accumulator with leaf count of `numleaves`.
 ```
 (position >> 1) | (1 << total_rows)
 ```
 
-`root_position(numleaves, row, total_rows)` is a function that returns the position of the root at the given row. Will return a garbage value if there's no root at the row.
+*root_position(numleaves, row, total_rows)* is a function that returns the position of the root at the given row. Will return a garbage value if there's no root at the row.
 ```
 mask = (2 << total_rows) - 1
 before = numleaves & (mask << (row + 1))
@@ -59,40 +51,35 @@ shifted = (before >> row) | (mask << (total_rows + 1 - row))
 shifted & mask
 ```
 
-`root_present(numleaves, row)` returns if there's a root at the given row in an accumulator with leaf count of `numleaves`.
+*root_present(numleaves, row)* returns if there's a root at the given row in an accumulator with leaf count of `numleaves`.
 ```
 numleaves & (1 << row) != 0
 ```
 
-`detect_row(position, total_rows)` is a function that returns which row the given position is at in an accumulator with row count of total_rows.
+*detect_row(position, total_rows)* is a function that returns which row the given position is at in an accumulator with row count of total_rows.
 ```
-marker = 1 << total_rows
-h = 0
-while position & marker != 0:
-    marker >>= 1
-    h += 1
-h
+for row in range(total_rows, -1, -1):
+    rowbit = 1 << row
+    if rowbit & position == 0: return total_rows-row
 ```
 
-`isroot(position, numleaves, total_rows)` returns if the position is a root in an accumulator with leaf count of `numleaves` and a row count of `total_rows`.
+*isroot(position, numleaves, total_rows)* returns if the position is a root in an accumulator with leaf count of `numleaves` and a row count of `total_rows`.
 ```
 row = detect_row(position, total_rows)
 root_present(numleaves, row) && position == root_position(numleaves, row, total_rows)
 ```
 
-`is_right_sibling(position)` returns true if the position is on the right side.
+*is_right_sibling(position)* returns true if the position is on the right side.
 ```
 position & 1 == 1
 ```
 
-`right_sibling(position)` returns the position of the sibling on the right side. Returns itself if the position is on the right.
+*right_sibling(position)* returns the position of the sibling on the right side. Returns itself if the position is on the right.
 ```
 position | 1
 ```
 
-`root_idx(numleaves, position)` returns the index of the root in the accumulator state that will be modified when deleting position.
-
-`getrootidxs(numleaves, positions)` returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions. Returned indexes are in descending order.
+*getrootidxs(numleaves, positions)* returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions. Returned indexes are in descending order.
 
 An Utreexo accumulator implementation MUST support these 3 operations: Add, Verify, and Delete.
 
@@ -192,14 +179,14 @@ The Addition algorithm Add(`acc`, `hash`) is defined as:
 The algorithm implemented in python:
 
 ```
-def add(acc: Stump, hash: bytes):
-    for row in range(tree_rows(acc.numleaves)+1):
-        if not root_present(acc.numleaves, row): break
-        root = acc.roots.pop()
+def add(self, hash: bytes):
+    for row in range(tree_rows(self.numleaves)+1):
+        if not root_present(self.numleaves, row): break
+        root = self.roots.pop()
         hash = parent_hash(root, hash)
 
-    acc.roots.append(hash)
-    acc.numleaves += 1
+    self.roots.append(hash)
+    self.numleaves += 1
 ```
 
 ## Proof
@@ -301,18 +288,18 @@ The Verification algorithm Verify(`acc`, `[]hash`, `proof`) is defined as:
 The algorithm implemented in python:
 
 ```
-def verify(acc: Stump, dels: [bytes], proof: Proof):
+def verify(self, dels: [bytes], proof: Proof):
     if len(dels) != len(proof.targets):
         raise("len of dels and proof.targets differ")
 
-    root_candidates = calculate_roots(acc.numleaves, dels, proof)
-    root_idxs = getrootidxs(acc.numleaves, proof.targets)
+    root_candidates = calculate_roots(self.numleaves, dels, proof)
+    root_idxs = getrootidxs(self.numleaves, proof.targets)
 
     if len(root_candidates) != len(root_idxs):
         raise("length of calculated roots from the proof and expected root count differ")
 
     for i, idx in enumerate(root_idxs):
-        if acc.roots[idx] != root_candidates[i]:
+        if self.roots[idx] != root_candidates[i]:
             raise("calculated roots from the proof and matched roots differ")
 ```
 
@@ -334,11 +321,11 @@ The Deletion algorithm Delete(`acc`, `Proof`) -> `acc` is defined as:
 The algorithm implemented in python:
 
 ```
-def delete(acc: Stump, proof: Proof):
-    modified_roots = calculate_roots(acc.numleaves, None, proof)
-    root_idxs = getrootidxs(acc.numleaves, proof.targets)
+def delete(self, proof: Proof):
+    modified_roots = calculate_roots(self.numleaves, None, proof)
+    root_idxs = getrootidxs(self.numleaves, proof.targets)
     for i, idx in enumerate(root_idxs):
-        acc.roots[idx] = modified_roots[i]
+        self.roots[idx] = modified_roots[i]
 ```
 
 [^1]: https://eprint.iacr.org/2015/718
