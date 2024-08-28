@@ -207,13 +207,12 @@ The calculate roots algorithm is defined as CalculateRoots(numleaves, `[]hash`, 
 - Loop until proof.targets are empty:
   - Pop off the first target in proof.targets. Pop off the associated hash as well.
   - If the the target is a root, we append to the calculated_roots vector and continue.
-  - Grab sibling hash to hash with. It'e either in proof.targets or proof.proof.
+  - Check if the next target in proof.targets is the right sibling of the current target. If it is, grab its hash as the sibling hash. Otherwise the next hash in proof.proof is the sibling hash.
   - Figure out if the sibling hash is on the left or the right.
-  - Apply *parent_hash* to the target hash and the sibling hash.
+  - Apply *parent_hash* to the target hash and the sibling hash with regards to their positioning.
   - Calculate parent position.
-  - parent position is inserted into the sorted proof.targets.
-  - parent hash is mapped to the parent position.
-
+  - Insert parent position into the sorted proof.targets.
+  - Map parent hash to the parent position.
 - Return calculated_roots
 
 The algorithm implemented in python:
