@@ -105,8 +105,7 @@ The new accumulator with all the positions:
 
 `proof` is an inclusion proof for elements in the accumulator. It's comprised of two fields:
   - `targets` are the positions of the elements being proven. Represented as a vector of uint64.
-  - `proof` are the hashes needed to hash the roots. Represented as a `[]hash`.
-- `proof.proof` MUST be in ascending order. The proof is considered invalid otherwise.
+  - `proof` are the hashes needed to hash the roots. Represented as a `[]hash`. `proof` MUST be in ascending order. The proof is considered invalid otherwise.
 
 # Specification
 
