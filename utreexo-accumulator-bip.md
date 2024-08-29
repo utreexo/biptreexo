@@ -115,9 +115,9 @@ The following utility functions are required for the accumulator operations:
 
 *parent_hash(left, right)* is the concatenation and hash of two child hashes. If either of the child hashes are nil, the returned result is just the non-nil child by itself.
 
-*treerows(numleaves)* is a function that returns the minimum number of bits needed to represent of `numleaves`-1. Returns 0 if `numleaves` is 0.
+*treerows(numleaves)* is a function that returns the minimum number of bits needed to represent `numleaves`-1. Returns 0 if `numleaves` is 0.
 
-*is_right_sibling(position)* returns boolean true if the given position is on the right side. Position is on the right side if the least significant bit is turned on.
+*is_right_sibling(position)* returns true if the given position is on the right side. If the least significant bit is turned on, the position is on the right side.
 
 *right_sibling(position)* returns the position of the sibling on the right side. It returns the given position if the position is already on the right side. Turning on the least significant bit returns the position on the right side.
 
@@ -154,7 +154,7 @@ root_present(numleaves, row) && position == root_position(numleaves, row, total_
 
 *getrootidxs(numleaves, positions)* returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions. Returned indexes are in descending order.
 
-An Utreexo accumulator implementation MUST support these 3 operations: Add, Verify, and Delete.
+An Utreexo accumulator implementation MUST support these 3 operations: Addition, Verification, and Deletion.
 
 ## Addition
 
@@ -167,11 +167,11 @@ existance with an inclusion proof.
 
 The Addition algorithm Add(`acc`, `hash`) is defined as:
 
-- From row 0 to and including `treerows(acc.numleaves)`
+- From row 0 to and including *treerows(acc.numleaves)*
   - Break if there's no root at this row.
   - *parent_hash* existing root at row with `hash`.
   - Make the result from *parent_hash* the new `hash`.
-- Increment acc.numleaves by 1.
+- Increment `acc.numleaves` by 1.
 - Append `hash` to acc.roots.
 
 The algorithm implemented in python:
