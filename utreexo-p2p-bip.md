@@ -94,16 +94,16 @@ Each position is represented as a uint64 and 4 of them are serialized in little 
 For example, when relaying transaction A that spends UTXOs at positions 5 and 10, the Inv message will look like so:
 
 |    Inv Type    |                                Data                                |
-|:--------------:|:------------------------------------------------------------------:|
+| -------------- | ------------------------------------------------------------------ |
 | MSG_UTREEXO_TX | TXIDA                                                              |
 | MSG_PROOF_HASH | 0x0000000000000005000000000000000AFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF |
 
 #### Relaying getdata for transactions to Utreexo peers
 
 When a Utreexo peer receives a inv message for a transaction, it uses the position information received with the inventory message to determine which hashes at which positions are required to verify that the inputs of the transaction exist.
-These positions are also serialized into the 32 byte array and uses the same inventory type as the inv message. For example, if the node requests for transaction A and positions 6 and 11 for the proof, it'll look like so:
+These positions are also serialized into the 32 byte array and uses the same inventory type as the inv message. For example, if the node requests for transaction A and positions 6 and 11 for the proof, it'll look like so 
 
 |    Inv Type    |                                Data                                |
-|:--------------:|:------------------------------------------------------------------:|
+| -------------- | ------------------------------------------------------------------ |
 | MSG_UTREEXO_TX | TXIDA                                                              |
 | MSG_PROOF_HASH | 0x0000000000000006000000000000000BFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF |
