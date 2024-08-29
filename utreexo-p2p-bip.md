@@ -88,17 +88,21 @@ For more information about how to use a Utreexo block and the Udata, refer to BI
 
 For transaction propagation, the protocol takes into account that the node may already have proofs cached in the mempool. Receiving the full proof like with the block is wasteful and the protocol for receiving the transaction proof takes this into account.
 
-We introduce a new inventory vector type MSG_PROOF_HASH and these inventory vectors are used to communicate the positions of the spent TXOs in the given transaction.
+We introduce a new inventory vector type `MSG_PROOF_HASH` and these inventory vectors are used to communicate the positions of the spent TXOs in the given transaction.
 Each position is represented as a uint64 and 4 of them are serialized in little endian format into the 32 byte array. If there are less than 4 to serialize into the 32 byte array, the trailing unused positions are padded with 18446744073709551615, the maximum value that a uint64 value can represent.
 For example, when relaying transaction A that spends UTXOs at positions 5 and 10, the Inv message will look like so:
 
-[MSG_UTREEXO_TX][TXIDA]
-[MSG_PROOF_HASH][0x0000000000000005000000000000000AFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF]
+|       Inv      |                                Data                                |
+|:--------------:|:------------------------------------------------------------------:|
+| MSG_UTREEXO_TX | TXIDA                                                              |
+| MSG_PROOF_HASH | 0x0000000000000005000000000000000AFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF |
 
 #### Relaying getdata for transactions to Utreexo peers
 
 When a Utreexo peer receives a inv message for a transaction, it uses the position information received with the inventory message to determine which hashes at which positions are required to verify that the inputs of the transaction exist.
 These positions are also serialized into the 32 byte array and uses the same inventory type as the inv message. For example, if the node requests for transaction A and positions 6 and 11 for the proof, it'll look like so:
 
-[MSG_UTREEXO_TX][TXIDA]
-[MSG_PROOF_HASH][0x0000000000000006000000000000000BFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF]
+|       Inv      |                                Data                                |
+|:--------------:|:------------------------------------------------------------------:|
+| MSG_UTREEXO_TX | TXIDA                                                              |
+| MSG_PROOF_HASH | 0x0000000000000006000000000000000BFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF |
