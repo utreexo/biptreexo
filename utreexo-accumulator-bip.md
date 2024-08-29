@@ -98,6 +98,7 @@ The new accumulator with all the positions:
 - `hash` refers to a vector of 32 byte arrays.
 - `[]hash` refers to a vector of `hash`.
 - `acc` refers to the Utreexo accumulator state.
+- `root` refers to the top `hash` in a tree in the `acc`.
 
 `acc` is comprised of 2 fields:
   - `roots` refers to the roots of the merkle trees. Represented as `[]hash`.
@@ -152,7 +153,20 @@ row = detect_row(position, total_rows)
 root_present(numleaves, row) && position == root_position(numleaves, row, total_rows)
 ```
 
-*getrootidxs(numleaves, positions)* returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions. Returned indexes are in descending order.
+*getrootidx(numleaves, position)* returns the index of the root in the accumulator state that will be modified when deleting the given position.
+```
+idx = 0
+for row in range(tree_rows(numleaves), -1, -1):
+    if not root_present(numleaves, row):
+        continue
+    pos = position
+    for _ in range(detect_row(position, tree_rows(numleaves)), row): pos = parent(pos, tree_rows(numleaves))
+    if isroot(pos, numleaves, tree_rows(numleaves)):
+        return idx
+    idx += 1
+```
+
+*getrootidxs(numleaves, positions)* returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions. Wrapper function around *getrootidx*.
 
 An Utreexo accumulator implementation MUST support these 3 operations: Addition, Verification, and Deletion.
 
@@ -161,9 +175,9 @@ An Utreexo accumulator implementation MUST support these 3 operations: Addition,
 Addition adds a leaf to the accumulator. The added leaves are able to be verified of their
 existance with an inclusion proof.
 
-- Inputs:
-  - The utreexo accumulator state.
-  - 32 byte array to be added.
+Inputs:
+  - `acc`.
+  - `hash` to be added.
 
 The Addition algorithm Add(`acc`, `hash`) is defined as:
 
@@ -192,26 +206,26 @@ def add(self, hash: bytes):
 Both the Verification and Deletion operations depend on the Calculate Roots function.
 
 - Inputs:
-  - The total number of leaves added to the accumulator state.
+  - `acc.numleaves`.
   - `[]hash` that are the hashes for the `proof.targets`.
   - `proof`.
 
 The passed in `[]hash` and `proof.targets` should be in the same order. The element at index i in []hashes should
-be the hash for element at index i in `proof.targets`. Otherwise the returned calculated_roots will be invalid.
+be the hash for element at index i in `proof.targets`. Otherwise the returned roots will be invalid.
 
 The calculate roots algorithm is defined as CalculateRoots(numleaves, `[]hash`, `proof`) -> calculated_roots:
 
 - Check if length of `proof.targets` is equal to the length of `[]hash`. Return early if they're not equal.
-- map proof.targets to their hash.
-- Sort proof.targets.
-- Loop until proof.targets are empty:
-  - Pop off the first target in proof.targets. Pop off the associated hash as well.
-  - If the the target is a root, we append to the calculated_roots vector and continue.
-  - Check if the next target in proof.targets is the right sibling of the current target. If it is, grab its hash as the sibling hash. Otherwise the next hash in proof.proof is the sibling hash.
+- map `proof.targets` to their hash.
+- Sort `proof.targets`.
+- Loop until `proof.targets` are empty:
+  - Pop off the first target in `proof.targets`. Pop off the associated `hash` as well.
+  - If the the target is a root, we append the current position's `hash` to the calculated_roots vector and continue.
+  - Check if the next target in `proof.targets` is the right sibling of the current target. If it is, grab its hash as the sibling hash. Otherwise the next hash in `proof.proof` is the sibling hash. Raise error if `proof.proof` is empty.
   - Figure out if the sibling hash is on the left or the right.
-  - Apply *parent_hash* to the target hash and the sibling hash with regards to their positioning.
+  - Apply *parent_hash* to the current position's `hash` and the sibling `hash` with regards to their positioning.
   - Calculate parent position.
-  - Insert parent position into the sorted proof.targets.
+  - Insert parent position into the sorted `proof.targets`.
   - Map parent hash to the parent position.
 - Return calculated_roots
 
