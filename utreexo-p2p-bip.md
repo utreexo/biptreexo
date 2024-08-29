@@ -6,6 +6,7 @@
         2. [Reconstructable Script](#reconstructable-script)
         3. [Udata](#udata)
         4. [`block` message](#block-message)
+        5. [`tx` message](#tx-message)
 
 # Abstract
 This BIP defines the networking-layer changes needed to allow nodes to exchange utreexo proofs. The present document **does not** describe how to validate blocks and transactions using the provided data, check BIP-VALIDATION for more details.
