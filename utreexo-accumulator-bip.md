@@ -112,6 +112,10 @@ The new accumulator with all the positions:
 
 The hash function SHA512/256[^2] is used for the hash operations in the accumulator.
 
+An Utreexo accumulator implementation MUST support these 3 operations: Addition, Verification, and Deletion.
+
+## Utility functions
+
 The following utility functions are required for the accumulator operations:
 
 *parent_hash(left, right)* is the concatenation and hash of two child hashes. If either of the child hashes are nil, the returned result is just the non-nil child by itself.
@@ -168,40 +172,7 @@ for row in range(tree_rows(numleaves), -1, -1):
 
 *getrootidxs(numleaves, positions)* returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions. Wrapper function around *getrootidx*.
 
-An Utreexo accumulator implementation MUST support these 3 operations: Addition, Verification, and Deletion.
-
-## Addition
-
-Addition adds a leaf to the accumulator. The added leaves are able to be verified of their
-existance with an inclusion proof.
-
-Inputs:
-  - `acc`.
-  - `hash` to be added.
-
-The Addition algorithm Add(`acc`, `hash`) is defined as:
-
-- From row 0 to and including *treerows(acc.numleaves)*
-  - Break if there's no root at this row.
-  - *parent_hash* existing root at row with `hash`.
-  - Make the result from *parent_hash* the new `hash`.
-- Increment `acc.numleaves` by 1.
-- Append `hash` to acc.roots.
-
-The algorithm implemented in python:
-
-```
-def add(self, hash: bytes):
-    for row in range(tree_rows(self.numleaves)+1):
-        if not root_present(self.numleaves, row): break
-        root = self.roots.pop()
-        hash = parent_hash(root, hash)
-
-    self.roots.append(hash)
-    self.numleaves += 1
-```
-
-## CalculateRoots
+### CalculateRoots
 
 Both the Verification and Deletion operations depend on the Calculate Roots function.
 
@@ -262,6 +233,37 @@ def calculate_roots(numleaves: int, dels: [bytes], proof: Proof) -> [bytes]:
         bisect.insort(sortedTargets, parent_pos)
 
     return calculated_roots
+```
+
+## Addition
+
+Addition adds a leaf to the accumulator. The added leaves are able to be verified of their
+existance with an inclusion proof.
+
+Inputs:
+  - `acc`.
+  - `hash` to be added.
+
+The Addition algorithm Add(`acc`, `hash`) is defined as:
+
+- From row 0 to and including *treerows(acc.numleaves)*
+  - Break if there's no root at this row.
+  - *parent_hash* existing root at row with `hash`.
+  - Make the result from *parent_hash* the new `hash`.
+- Increment `acc.numleaves` by 1.
+- Append `hash` to acc.roots.
+
+The algorithm implemented in python:
+
+```
+def add(self, hash: bytes):
+    for row in range(tree_rows(self.numleaves)+1):
+        if not root_present(self.numleaves, row): break
+        root = self.roots.pop()
+        hash = parent_hash(root, hash)
+
+    self.roots.append(hash)
+    self.numleaves += 1
 ```
 
 ## Verification
