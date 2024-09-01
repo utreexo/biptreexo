@@ -5,26 +5,38 @@ This document defines the process for representing, updating and verifying proof
 
 This BIP is licensed under the BSD 3-clause license.
 
-# Motivation
+# Motivation 
 
-The Bitcoin UTXO set grows at a O(N) where N is each UTXO as the UTXO set is
-represented with a key-value database. This is problematic as every full node
-needs to keep track of the UTXO set. The Utreexo accumulator caps the growth of
-the UTXO set to O(log2N) as Utreexo is a collection of merkle trees.
+The Bitcoin UTXO set continues to grow, currently over 10GB.  While much less than the size
+of the blockchain, UTXO set growth is only bounded by the 1MB un-discounted block size limit.
+This is problematic as every fully validating node needs to store the entire UTXO set. 
+The Utreexo accumulator removes this requirement, allowing fully validating nodes to store
+a small cryptographic accumulator of the UTXO set instead of the entire set.  
+The accumulator requires storage of O(log_2(N)) where N is the number of UTXOs.
+
+This BIP document describes the design of the accumulator structure used in Utreeexo, which uses the accumulator to commit UTXO data into leaves of the accumulator.  The reset of this document 
 
 # Design
 
 An accumulator is a data structure that allows for the compact representation of a set. The Utreexo
 accumulator uses an append only merkle tree design found in [^1] and extends the work to make deletions
-possible in O(log2N).
+possible while increasing accumulator storage size to O(log_2(N)).
 
-## Positions in the accumulator
+## Merkle Forest
 
-Each of the hashes in the Utreexo accumulator can be referred by a position represented by uint64.
-The positions are based off of the total amount of rows the accumulator was allocated for. The
-positions are numbered from 0 to 2^N where N is the number of total rows in the accumulator.
-Elements in each of the row are numbered in ascending order, moving up to the leftmost element in
-the row above.
+The Utreexo accumulator consists of a set of Merkle trees: perfect (2^n element) binary trees containing 32 byte hashes at every location in the tree.  The elements to be stored appear at the bottom hashes of the tree and we refer to as "leaves", the top hash of the tree is the "root" and hashes not on the top or bottom rows are "intermediate".  Any integer number of N elements can be represented by, on average, log_2(N)/2 trees.  For example, a forest with 5 elements would consist of a tree of 4 elements and a tree of 1 element.  A forest of 8 elements would only need a single tree as 8 is a power of 2.
+
+Looking at the binary representation of the number of elements to store, the number of trees needed is the number of 1-bits.
+
+For example, the decimal number 21, in binary, is 0b10101.  There are 3 1's in 0b10101, thus 3 trees are needed in the forest.  The sizes of the trees map to the bit positions in the binary number as well: 0b10101 will have a 16-element tree, no 8 element tree, a 4 element tree, no 2 element tree, and a 1 element tree.
+
+## Positions in the forest
+
+Each of the hashes in the forest can be referred by an integer label.
+This labeling is a convention we find easiest to use but does not directly affect the design of the accumulator; other labelling systems could also work and be translated to this one.
+
+We label positions starting at 0 on the bottom left, incrementing as we traverse the bottom row from left to right, and then continue on to higher rows.  There may be gaps in the label numbers when moving up a row; the label numbers are "padded out" to the next perfect tree that could encompass the entire forest.
+
 
 For example, an accumulator state with N=3 will look like so:
 
