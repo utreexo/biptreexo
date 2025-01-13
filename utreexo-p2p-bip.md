@@ -13,7 +13,96 @@ Utreexo creates a compact representation of the UTXO set that only takes a coupl
 # License
 This BIP is licensed under the BSD 3-clause license.
 
+# Definitions
+
+Block Headers: The 80 byte block headers we all know and love.  They are tied to a block's transactions via the merkle root field, and the hash of the header is the unique identifier for the entire block.
+
+Block Summaries: Tied to a specific block by including a block hash.  A short (a few kilobytes) message about a block describing which UTXOs are spent in the block.
+
+Block Proof: Also tied to a specific block by including a block hash.  A message containing hash based proof data which proves the validity of UTXOs being spent in the block.  Similar in size to a full block.
+
+# Synchronization
+
+In the simplest setup, there's no difference in how a node downloads the 2nd block and the 2nd block from the current tip.  A syncing node would download the block, which includes the 80 byte header and all transactions, and the full block proof, which provides the UTXO data for all inputs in the block, and proves the inclusion of those UTXOs in the accumulator.  
+
+[note: write this up as a post-IBD flow, should describe that in detail too] 
+
+# IBD optimizations
+
+While using this method a node can securely synchronize, there are several optimizations that can be done for the initial block download (IBD).  These optimizations allow nodes to reduce the total data downloaded during IBD while still getting the same security assurances about the end state of the UTXO set.  
+
+The optimizations require some data to be hard-coded into the program (or supplied with the program in a settings file, command line argument, etc).  Similar to the assumeValid hashes, they give a blockhash that if encountered, causes different behavior, but does not *require* that blockhash to be present.
+
+The hard-coded data consists of two hashes: a Summary Tree Root and an Accumulator Roots Tree Root.  Both of these are tied to a block hash.  For example
+
+(00000000000000000002923a7456aa3d4adce139cd16550c3ff36d07cc45d251, a408dd7455d52009e73167b4a1139d8b473461d53f20ace59867dea0156db6d6, 
+ef9e0a42da5448deca12051f9074de7d99797c51db6d0bda322943154893b64a)
+
+This is the block hash of block 875000 on mainnet, the root of the Summary Tree, and the Root of the Accumulator Roots Tree.  If block ...d251 is encountered at height 875000 during the headers-first phase of IBD, the two roots are activated and can be used.
+
+Block Summary
+
+A block summary has the following fields:
+numOuts, numIns, [UTXOnumbers]
+Where numOuts is the number of (filtered) outputs in the block, numIns is the number of (filtered) inputs in the block, and UTXONumbers are the canonical numbers for every UTXO spent in the block.
+
+By filtered, there are two ways an output can be dropped from these lists, one of which also applies to inputs.  If an output is clearly not spendable, (eg an OP_RETURN output), it is not included as an output for the count of numOuts.  Also, if an output is created and spent in the same block, it is also skipped for the purposes of the block summary and Utreexo in general; UTXOs like this "never hit the disk" as they are never confirmed, and don't affect the accumulator.
+
+Summary tree
+
+The summary tree is a merkle tree which commits to Block Summaries for every block up to the hard-coded height (in our example 875000).  
+
+
+# IBD flow
+
+
+
+
+
 # Specification
+
+
+
+
+
+
+IBD message flow:
+
+
+Normal (same as core) get 2000 headers at a time
+
+-> GetHeaders (x2000)
+<- Headers (x2000)
+
+
+Summary root & proof.
+
+Root of summary
+
+both multi
+and their own messages
+
+-> GetBlockSummary (100)
+<- BlockSummary (100)
+
+New message types:
+
+
+
+post summary, pre tip
+
+get 1 summary, get 1 block, go to next
+
+
+
+
+request proof:  request indexes, server does not deserialize but can truncate & concatenate
+don't deserialize
+
+-->
+
+
+
 
 For utreexo P2P usage, no new message types are defined.  The same flow of messages and state machines is used, with modifications to existing network messages, including new INV types.
 
