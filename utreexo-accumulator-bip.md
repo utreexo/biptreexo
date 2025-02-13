@@ -37,8 +37,7 @@ This labeling is a convention we find easiest to use but does not directly affec
 
 We label positions starting at 0 on the bottom left, incrementing as we traverse the bottom row from left to right, and then continue on to higher rows.  There may be gaps in the label numbers when moving up a row; the label numbers are "padded out" to the next perfect tree that could encompass the entire forest.
 
-
-For example, an accumulator state with N=3 will look like so:
+For example, a forest with 8 leaves will have a single tree and positions will be labeled like this:
 
 ```
 14
@@ -50,8 +49,7 @@ For example, an accumulator state with N=3 will look like so:
 00  01  02  03  04  05  06  07
 ```
 
-It's possible to have less than 2^N elements in the accumulator. For an accumulator state where
-N=3 but with 6 elements will look like so:
+While a forest with 7 leaves will 
 
 ```
 
@@ -60,8 +58,16 @@ N=3 but with 6 elements will look like so:
 |-------\       |-------\
 08      09      10
 |---\   |---\   |---\   |---\
-00  01  02  03  04  05
+00  01  02  03  04  05  06
 ```
+
+
+For example, an accumulator state with N=3 will look like so:
+
+
+It's possible to have less than 2^N elements in the accumulator. For an accumulator state where
+N=3 but with 6 elements will look like so:
+
 
 When adding another leaf to the accumulator when it's already allocated 2^N leaves will result in
 the accumulator resizing to hold 2^(N+1) leaves. For example, when adding a leaf to the accumulator

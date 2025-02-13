@@ -33,24 +33,56 @@ While using this method a node can securely synchronize, there are several optim
 
 The optimizations require some data to be hard-coded into the program (or supplied with the program in a settings file, command line argument, etc).  Similar to the assumeValid hashes, they give a blockhash that if encountered, causes different behavior, but does not *require* that blockhash to be present.
 
-The hard-coded data consists of two hashes: a Summary Tree Root and an Accumulator Roots Tree Root.  Both of these are tied to a block hash.  For example
+The hard-coded data consists of two hashes: a Summary Tree Root set and a ?? rootset.  Both of these are tied to a block hash and height.  For example
 
-(00000000000000000002923a7456aa3d4adce139cd16550c3ff36d07cc45d251, a408dd7455d52009e73167b4a1139d8b473461d53f20ace59867dea0156db6d6, 
-ef9e0a42da5448deca12051f9074de7d99797c51db6d0bda322943154893b64a)
+{"blockhash": 00000000000000000001ed379d0396bf1ac2f8cfd8b40348f08ba7a4990c7b9a, "height": 868352,
+"Summary forest roots": [a408dd7455d52009e73167b4a1139d8b473461d53f20ace59867dea0156db6d6, f9a38bd7fabf3b790dd411900553b936fb902cb3760d4c099d74ef49ba6c702d, 3976b5a8d5d46634186c0eb6a043617a3e6f5809a5387d7602e950e08ad1e13b, 3a244de65dd60bc113b43272534693085fc495cf89574d36ad133919d60491b5], 
+"Linkup forest roots ": [ef9e0a42da5448deca12051f9074de7d99797c51db6d0bda322943154893b64a, 84672a79b529fdf5a4c09fd59e22fc978834068d4711cbcd65c88df106be7869, 0ed0b17bea326d8d9f866ddb3b35d1e002027dcef8b7035a3b6cc37f0a035b4f, 359b276cf0373964d8a2e99347b727de8eb2a2cc0e029ba5421616d258d55d6d]
+}
 
-This is the block hash of block 875000 on mainnet, the root of the Summary Tree, and the Root of the Accumulator Roots Tree.  If block ...d251 is encountered at height 875000 during the headers-first phase of IBD, the two roots are activated and can be used.
 
-Block Summary
+
+This is the block hash of block 868352 on mainnet, the root of the Summary Tree, and the Root of the Accumulator Roots Tree.  If block ...7b9a is encountered at height 868352 during the headers-first phase of IBD, the two roots are activated and can be used.
+
+
+
+
+# root root is not static, use the same utreexo algo and append; clients may get extra long proofs but should be OK, !!check!!
+
+## Block Summary
 
 A block summary has the following fields:
 numOuts, numIns, [UTXOnumbers]
-Where numOuts is the number of (filtered) outputs in the block, numIns is the number of (filtered) inputs in the block, and UTXONumbers are the canonical numbers for every UTXO spent in the block.
+
+numOuts is the number of (filtered) outputs in the block, numIns is the number of (filtered) inputs in the block, and UTXONumbers are the canonical numbers for every UTXO spent in the block.
+
+### input / output filtering 
+(is this defined anywhere else?  If not, define here -- )
 
 By filtered, there are two ways an output can be dropped from these lists, one of which also applies to inputs.  If an output is clearly not spendable, (eg an OP_RETURN output), it is not included as an output for the count of numOuts.  Also, if an output is created and spent in the same block, it is also skipped for the purposes of the block summary and Utreexo in general; UTXOs like this "never hit the disk" as they are never confirmed, and don't affect the accumulator.
 
-Summary tree
+## Summary forest
 
-The summary tree is a merkle tree which commits to Block Summaries for every block up to the hard-coded height (in our example 875000).  
+The summary tree is a merkle forest which contains to Block Summaries for every block.  Archive nodes provide these Block Summaries, along with proofs, to Utreexo nodes performing IBD.  Archive Utreexo nodes keep the entire forest of summaries.  The forest itself only grows at about 3MB per year, but the summaries themselves are significantly larger, up to tens of kilobytes for each block, leading to sizes of around 1GB per year.  The summary data is highly compressable, since it is almost completely runs of correlated / nearby integers.  Archive nodes can compress this data, to save on their disk storage, and it may make sense to also support sending the data in compressed format as well.
+
+
+## IBD Linkup
+
+Because the size of the state needed to validate blocks is so small with Utreexo, nodes can perform IBD in parallel and out of order.  For example, a computer could divide the task of validating 800,000 blocks into 100 tasks of 8,000 blocks each: blocks 1 through 800, 800 through 1600, 1600 through 2400, and so on.
+In order start the 1600 through 2400 IBD task, however, the node should know what the state of the utxo set is at block 1600, so that it can validate and modify the accumulator.  In order to do this, the binary can provide "linkup hints", where the state of the accumulator is given for a desired block hash.  While giving the state of the system might seem at first glance to be introducing a trust assumption, these are not trusted states; the node performing IBD tries out the state given for a block height, but checks that when that state is reached from the thread "below" that it properly links up, with the accumulator state arrived at through full validation matching the state given.  If that link up does not successfully happen, the IBD process should halt; these hints are statements of fact that are hard-coded into the program itself, and if they are false all bets are off about the program.
+
+The format of the Linkup hints is:
+
+Blockhash, Numleaves, [Roots]
+
+Archive nodes create a forest of Linkup hints, so that they can prove, with respect to the Linkup forest roots in a node performing IBD, what their binary has claimed the utxo accumulator state to be at any block height.
+
+
+(write about proofs working even if they're too long)
+
+
+
+
 
 
 # IBD flow
