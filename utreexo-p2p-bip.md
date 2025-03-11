@@ -24,6 +24,10 @@ Block Proof:  A message containing hash based proof data which proves the validi
 
 # Utreexo Messages
 
+Block Summary:
+    Numadds, numdels, deletion positions
+    (separate from block proof message;  nodes get this first so they can request only the proof they need)    
+
 Block Proof:
     leafdata, deletion positions, proof hashes
     (separate from block message; you can get block messages from non-utreexo nodes)
@@ -34,6 +38,25 @@ Inv:
 MsgTx:
     Message with leafdata & proof hashes
     
+
+Get summary first so you know what you need
+Requesting block proof: bitmaps
+
+
+### Proof request message
+	A node which has received a Block Summary for a block can determine the positions of hashes for the full block proof.  This also allows the nodes to determine what portion of the full proof they need to verify inclusion of all utxos consumed in the block.  For nodes which don't cache anything determining this is easy: request the full proof.  For nodes which have retained some forest data, they can request only the hashes they lack, saving considerable bandwidth.
+
+
+3 request methods:
+
+Truncation
+
+The simplest request method is truncation.  Nodes construct the full proof locations, determine which they need, and determine the last hash they need in the full proof.  They provide the index of this final hash to the proving server.  The server truncates the full proof, omitting everything after the final hash requested and sending the needed prefix.
+
+Bitmap
+
+The node assigns a single bit for every hash in the full proof (padded to the nearest byte boundary) and sets the bit to 1 for hashes requested, and 0 for hashes not needed.  The server reads the full proof from disk, adding only hashes with a 1 bit to the buffer sent back to the node.
+
 
 
 
@@ -125,7 +148,7 @@ As an example, an archive node is up to date at block height 15, having only a s
 00  01  02  03  04  05  06  07  08  09  10  11  12  13  14  15
 ```
 
-The synchronizing node has a roots commited at block height 09, with roots at 28 and 20.
+The synchronizing node has a roots committed at block height 09, with roots at 28 and 20.
 
 ```
 28                               
