@@ -24,12 +24,18 @@ Block Proof:  A message containing hash based proof data which proves the validi
 
 # Utreexo Messages
 
+Block Summary Request:
+	Block Hash
+
 Block Summary:
     Numadds, numdels, deletion positions
     (separate from block proof message;  nodes get this first so they can request only the proof they need)    
 
+Block Proof Request:
+	Block Hash
+
 Block Proof:
-    leafdata, deletion positions, proof hashes
+    leafdata, proof hashes
     (separate from block message; you can get block messages from non-utreexo nodes)
 
 Inv:
@@ -46,18 +52,13 @@ Requesting block proof: bitmaps
 ### Proof request message
 	A node which has received a Block Summary for a block can determine the positions of hashes for the full block proof.  This also allows the nodes to determine what portion of the full proof they need to verify inclusion of all utxos consumed in the block.  For nodes which don't cache anything determining this is easy: request the full proof.  For nodes which have retained some forest data, they can request only the hashes they lack, saving considerable bandwidth.
 
+Hash Request Bitmap
 
-3 request methods:
+The Block Proof message contains the number of deletions in the block, from which the total number of hashes in the proof can be calculated.  For each hash in the full proof a bit is assigned, using big-endian and padded to the nearest byte, with 1 meaning a request for that hash, and 0 meaning omit that hash.  
 
-Truncation
+For example, a block proof with 374 hashes would give a 47 byte bitmap, with hash 0 corresponding to the MSB of byte 0, hash 367 corresponding to the LSB of byte 46, and hash 373 corresponding to bit 2 of byte 46.  The final 2 least significant bits of byte 46 are left as 0s.
 
-The simplest request method is truncation.  Nodes construct the full proof locations, determine which they need, and determine the last hash they need in the full proof.  They provide the index of this final hash to the proving server.  The server truncates the full proof, omitting everything after the final hash requested and sending the needed prefix.
-
-Bitmap
-
-The node assigns a single bit for every hash in the full proof (padded to the nearest byte boundary) and sets the bit to 1 for hashes requested, and 0 for hashes not needed.  The server reads the full proof from disk, adding only hashes with a 1 bit to the buffer sent back to the node.
-
-
+Using this bitmap, the node can request the specific hashes it needs, omitting those which it has cached.  The server repling can respond with only the requested portion of the block proof without needing to deserialize the proof; it can loop through the bits of the Proof Request Bitmap and move through the on-disk proof in 32 byte steps, copying to the network buffer if the bit is set, and skipping if the bit is unset.
 
 
 # Synchronization
@@ -93,19 +94,17 @@ The hard-coded data consists of two hashes: a Summary Tree Root set and a Linkup
 
 ## IBD-only messages (optional)
 
-Request Block Summary:
+Block Summary Range Request:
 	Block Hash
 	Log2 number of summaries requested (1 << n summaries)
 
-Block Summaries:
+Block Summary Range:
     For each block:
 		numadds, numdels, deletion positions
     proof to summary forest (for the first summary)
 
-
-
-Block Proof (IBD):
-    leafdata, proof hashes
+Linkup Hint Request:
+	Block Hash
 
 Linkup hint:
     numleaves, []hash
