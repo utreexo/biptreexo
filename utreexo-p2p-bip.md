@@ -13,6 +13,13 @@ Utreexo creates a compact representation of the UTXO set that only takes a coupl
 # License
 This BIP is licensed under the BSD 3-clause license.
 
+# Requirements and Compatibility
+
+Nodes implementing Utreexo can choose which messages to support.  There are a number of configurations possible, and this BIP does not restrict nodes to any subsets of messages.  That said, there are two likely types of nodes: Compact State Nodes (CSNs) which have the goal of minimizing data storage and download while performing block validation, and archive and bridge nodes which store more data and provide this data to CSNs.  Bridge nodes, nodes which can add inclusion proofs to mempool transactions, support the same set of messages as CSNs, and in fact should be indistinguishable from CSNs on the network.  Archive nodes can send messages such as block summaries and block proofs.  
+
+Note that the archive and bridge capabilities of a node are separate; a bridge node can be bridge only, without previous block proof data, and an archive node doesn't need to be able to bridge.
+ 
+
 # Definitions
 
 Block Headers: The 80 byte block headers we all know and love.  The hash of the header is used as the unique identifier for the entire block.
@@ -25,7 +32,12 @@ Block Proof:  A message containing hash based proof data which proves the validi
 # Utreexo Messages
 
 Block Summary Request:
-	Block Hash
+    Block Hash*
+
+The block Summery request message consists of a single 32 byte block hash, however the hash is modified in the following way:
+The lowest byte of the hash will always be 0 on mainnet and most test networks.  This byte is used to request additional information.
+Bit 7 of this byte indicates if a proof to the summary tree root is requested.  
+
 
 Block Summary:
     Numadds, numdels, deletion positions
@@ -102,6 +114,8 @@ Block Summary Range:
     For each block:
 		numadds, numdels, deletion positions
     proof to summary forest (for the first summary)
+
+(Same message, top byte, MSB is give proof to hardcoded forest, other bits are exponent of range)
 
 Linkup Hint Request:
 	Block Hash
@@ -205,26 +219,3 @@ The possible values for the tag are:
 | 0x03 |  ScriptHash |
 | 0x04 | WitnessV0ScriptHash |
 
-### Udata
-
-Udata is all the data needed to validate that block, along with some extra hints for caching.
-
-| Field | Descrition |
-|--------|---------------|
-| Batch Proof | A batch proof over all inputs being spent that haven’t been created in this block (see BIP-VALIDATION for more details) |
-| Remember Index | For future developments, should be 0x00 |
-| Leaf data | An array of compact leaf data |
-
-### `block` message
-| Field | Description |
-|--------|-----------------|
-| Block data | The usual block data, with or without witness |
-| Udata | All the utreexo context needed for this block, as defined in [Udata](Udata) |
-
-| Field | Description |
-|--------|-----------------|
-| Block data | The usual block data, with or without witness |
-| Udata | All the utreexo context needed for this block, as defined in [Udata](Udata) |
-
-
-For more information about how to use a Utreexo bock and the Udata, referer to BIP-VALIDATION.
