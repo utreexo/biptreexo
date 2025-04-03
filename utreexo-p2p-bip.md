@@ -15,10 +15,13 @@ This BIP is licensed under the BSD 3-clause license.
 
 # Requirements and Compatibility
 
-Nodes implementing Utreexo can choose which messages to support.  There are a number of configurations possible, and this BIP does not restrict nodes to any subsets of messages.  That said, there are two likely types of nodes: Compact State Nodes (CSNs) which have the goal of minimizing data storage and download while performing block validation, and archive and bridge nodes which store more data and provide this data to CSNs.  Bridge nodes, nodes which can add inclusion proofs to mempool transactions, support the same set of messages as CSNs, and in fact should be indistinguishable from CSNs on the network.  Archive nodes can send messages such as block summaries and block proofs.  
+Nodes implementing Utreexo can choose which messages to support.  There are a number of configurations possible, and this BIP does not restrict nodes to any subsets of messages.  That said, there are two likely types of nodes: Compact State Nodes (CSNs) which have the goal of minimizing data storage and download while performing block validation, and archive and bridge nodes which store more data and provide this data to CSNs.  Bridge nodes, nodes which can add inclusion proofs to mempool transactions, support the same set of messages as CSNs, and in fact should be indistinguishable from CSNs on the network.  Archive nodes can send messages such as block summaries and block proofs.
 
 Note that the archive and bridge capabilities of a node are separate; a bridge node can be bridge only, without previous block proof data, and an archive node doesn't need to be able to bridge.
- 
+
+The one exception to this flexibility is that archive nodes must provide both block summaries and block proofs.   While theoretically possible to split these two resources, the bock summaries are quite small relative to the block proofs, and it simplifies clients to be able to rely on being able to request both over the same connection.
+
+
 
 # Definitions
 
@@ -27,6 +30,18 @@ Block Headers: The 80 byte block headers we all know and love.  The hash of the 
 Block Summaries: A short (a few kilobytes) message about a block describing which UTXOs are spent in the block.  Tied to a specific block by including a block hash.
 
 Block Proof:  A message containing hash based proof data which proves the validity of UTXOs being spent in the block.  Similar in size to a full block.  Also tied to a specific block by including a block hash.
+
+# Overview
+
+## Pre-P2P: Bridge Building
+
+When introducing utreexo into an existing network, there are 2 thing needed before CSNs can operate:  First, archive nodes need to build proofs for old blocks to serve during IBD, and second, nodes need to build and maintain the UTXO merkle forest, and an index of outpoints to leaves of that forest, so that they can build proofs for new transactions.  Both of these processes happen without any p2p messages by taking an already existing, synchronized archive full node and going through its stored block data.
+
+Once an archive and bridge node have been established, CSNs use utreexo to IBD and maintain sync with the bitcoin network. 
+
+## IBD
+
+When a utreexo node
 
 
 # Utreexo Messages
@@ -55,7 +70,7 @@ Inv:
 
 MsgTx:
     Message with leafdata & proof hashes
-    
+
 
 Get summary first so you know what you need
 Requesting block proof: bitmaps
