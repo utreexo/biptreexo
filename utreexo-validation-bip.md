@@ -8,7 +8,7 @@ represent the UTXO set.
 2. [Motivation](#motivation)
 3. [Design](#design)
 4. [Specification](#specification)
-5. [BIP0030](#bip0030)
+5. [Implementation](#implementation)
 
 # License
 This BIP is licensed under the BSD 3-clause license.
@@ -26,19 +26,19 @@ updating the UTXO set state on new blocks.
 There are 5 consensus critical parts of using the utreexo accumulator to
 represent the UTXO set:
 
-1: The serialized data of each UTXO ("leaf data").
-2: The hash function used to hash the leaf data.
-3: Which transaction outputs are excluded from the accumulator.
-4: The order of operations for the additions and deletions in the accumulator.
-5: The format of the UTXO proof.
+1. The serialized data of each UTXO ("leaf data").
+2. The hash function used to hash the leaf data.
+3. Which transaction outputs are excluded from the accumulator.
+4. The order of operations for the additions and deletions in the accumulator.
+5. The format of the UTXO proof.
 
 A discrepancy in any of the above 5 categories will result in a different
 accumulator state, leading to consensus incompatibilities.
 
-## Specification
+# Specification
 The serialization for all the data is in little-endian format.
 
-#### UTXO Hash Preimages
+## UTXO Hash Preimages
 Individual UTXOs are represented as 32 byte hashes in the Utreexo accumulator.
 Below outlines the data that was used to calculate those hashes:
 
@@ -54,7 +54,7 @@ Below outlines the data that was used to calculate those hashes:
 | scriptPubkey size | varint                   | scriptPubKey length in bytes              |
 | scriptPubkey      | variable byte array      | The locking script of the UTXO            |
 
-##### Version tag
+### Version tag
 We use tagged hashes for the hashes committed in the accumulator for versioning
 purposes. This is added so that if there are changes in the preimage of the
 hash, the version tag helps to avoid misinterpretation.
@@ -65,7 +65,7 @@ string, it's "5574726565786f5631".  (The resulting 64 byte output is
 5b832db8ca26c25be1c542d6cceddda8c145615cff5c35727fb3462610807e20ae534dc3f64299199931772e03787d18156eb3151e0ed1b3098bdc8445861885)
 (right?)
 
-##### Blockhash
+### Blockhash
 We commit to the blockhash of the block which confirms the UTXO.  This
 is not currently used in the validation code, but could be used at a future
 version to increase the work required for collision attacks.
@@ -76,13 +76,13 @@ operations for an n-bit hash.
 This could allow a later or alternate version to use shorter truncated hashes,
 saving bandwidth and storage while still keeping Bitcoin's 2^128 security.
 
-##### TXID
+### TXID
 This field is added along with the vout to commit to the outpoint of a UTXO.
 
-##### VOUT
+### VOUT
 This field is added along with the TXID to commit to the outpoint of a UTXO.
 
-##### Header code
+### Header code
 This field stores the block height and a boolean for marking that the utxo is
 part of a coinbase transaction. Mostly serves to save space as the coinbase
 boolean can be stored in a single bit.
@@ -108,27 +108,27 @@ The boolean for coinbase is needed as coinbase transactions that do not have 100
 confirmations is not valid and should be rejected. This data is also stored
 locally as a part of the UTXO set for current nodes.
 
-##### Amount
+### Amount
 This field is added to commit to the value of the UTXO. With current nodes, this
 is stored in the UTXO set but since we receive this in the proof from our peers,
 we need to commit to this value to avoid malicious peers that may send over the
 wrong amount.
 
-##### script pubkey size
+### script pubkey size
 As the script pubkey is a variable length byte array, we prepend it with the
 length.
 
-##### script pubkey
+### script pubkey
 This field is added to commit to the locking script of the UTXO. With current
 nodes, this is stored in the UTXO set but since we receive this in the proof
 from our peers, we need to commit to this value to avoid malicious peers that
 may send over the wrong locking script.
 
-#### Hash function
+## Hash function
 The leaf data is hashed with SHA-512/256, which gives us a 32 byte hash.
 It was chosen over SHA-256 due to the faster performance on 64 bit systems.
 
-#### Excluded UTXOs from the accumulator
+## Excluded UTXOs from the accumulator
 Not all transaction outputs are added to a node's UTXO set.  Normal Bitcoin nodes
 only form consensus on the set of transactions, not on the UTXO set, so different 
 nodes can omit different otuputs and stay compatible as long as those outputs are
@@ -138,14 +138,14 @@ as all proofs are with respect to the merkle roots of the entire set.
 For this reason, we define which UTXOs are not inserted to the accumulator.  Any 
 variations here will result in Utreexo nodes with incompatible proofs.
 
-##### Provably unspendable transaction outputs
+## Provably unspendable transaction outputs
 There are outputs in the Bitcoin network that we can guarantee that they cannot
 be spent without a hard-fork of the network. The following output types are not
 added to the accumulator:
 - Outputs that start with an OP_RETURN (0x6a)
 - Outputs with a scriptPubkey larger than 10,000 bytes
 
-##### Same block spends
+## Same block spends
 Often, UTXOs are created and spent in the same block. This is allowed by Bitcoin
 consensus rules as long as the output being spent is created by a transaction earlier
 in the block than the spending transaction. 
@@ -160,20 +160,19 @@ cannot be proven with the Utreexo accumulator (and SPV proofs already provide th
 For these reasons, outputs which are spent in the same block where they are created 
 are omitted from the accumulator, and those inputs are omitted from block proofs.
 
-#### Order of operations
+## Order of operations
 The Utreexo accumulator lacks associative properties during addition and the
 ordering of which UTXO hash gets added first is consensus critical. For
-the modification of the accumulator the steps are as follows:
+the modification of the accumulator, the steps are as follows:
 
-1: Batch remove the UTXOs that were spent in the block based on the algorithm
-   defined in bip ???.  Deletions are order-independent.
-2: Batch add all non-excluded outputs in the order they're included in the
-   Bitcoin block.
+1. Verify that the UTXOs that were spent in the block. Raise error if the verification fails.
+2. Batch remove the UTXOs that were spent in the block. Deletions are order-independent.
+3. Add all non-excluded outputs in the order they're included in the Bitcoin block.
 
-The removal and the addition of the hashes follow the algorithms defined in
+The verification, removal and the addition operations follow the algorithms defined in
 bip ???.
 
-#### Format of the utxo proof
+## Format of the utxo proof
 The utxo proof has 2 elements: the accumulator proof and the leaf data. The 
 leaf data provides the necessary utxo data for block validation that would be
 stored locally for non-utreexo nodes. The accumulator proof proves that the
@@ -196,7 +195,7 @@ index.
 | Accumulator Proof   | variable byte array | variable  | The utreexo proof as defined in bip ??? |
 | UTXO hash preimages | variable byte array | variable  | The utxo data needed to validate all the transaction in the block |
 
-#### Utxo proof validation
+## Utxo proof validation
 For each block, the utxo proof must be provided with the bitcoin block for
 validation to be possible. Without the utxo proof, it's not possible to
 validate that the inputs being referenced exists in the UTXO set.
@@ -209,16 +208,16 @@ set.
 
 The order of operations for the utxo proof validation are:
 
-1: Hash the utxo preimages.
-2: Verify that the utxo preimages exist in the accumulator with the verification
+1. Hash the utxo preimages.
+2. Verify that the utxo preimages exist in the accumulator with the verification
    algorithm specified in bip ???.
 
-### BIP0030
+## BIP0030
 BIP0030 is an added consensus check that prevents duplicate TXIDs. This check
 and the historical violations of this check affect the consensus validation for
 Utreexo nodes.
 
-### BIP0030 and BIP0034 consensus check
+## BIP0030 and BIP0034 consensus check
 Before BIP0030, the Bitcoin consensus rules allowed for duplicate TXIDs. If two
 transactions shared a same TXID, the transaction outputs of the preceeding
 transaction would overwrite the previously created UTXOs. It was assumed that
@@ -255,7 +254,7 @@ consensus failure due to the inability to perform the BIP0030 checks. However,
 this block will happen in roughly 21 years from now and mitigation of the
 BIP0030 checks are defined in bip ??? and suggested as a soft-fork.
 
-### Historical BIP0030 violations
+## Historical BIP0030 violations
 There were two UTXOs that were overwritten due to this consensus rule are:
 e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468:0 at block height 91,722
 d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599:0 at block height 91,812
@@ -274,3 +273,7 @@ These two leaf hashes encoded in hex string are:
 
 (1) represents the UTXO created at block height 91,722 and (2) represents the
 UTXO created at block height 91,812.
+
+# Implementation
+- Go implementation - https://github.com/utreexo/utreexod
+- Rust implementation - https://github.com/vinteumorg/Floresta
