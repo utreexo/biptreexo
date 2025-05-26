@@ -274,3 +274,24 @@ These two leaf hashes encoded in hex string are:
 
 (1) represents the UTXO created at block height 91,722 and (2) represents the
 UTXO created at block height 91,812.
+
+
+## Rationale
+
+Why use a hash based accumulator, instead of something more powerful, like an RSA accumulator, class groups, etc?
+
+Bridge nodes.  
+
+The advantage of other accumulators tends to be in proof size.  And those advantages can be big: in RSA accumulators, the proof for all the UTXOs in a block would be the same size as proving a single UTXO.  But creating the proofs can be more difficult.  In Utreexo, we need a Bridge Node to maintain backwards compatibility with nodes and wallets that don't use Utreexo.  A bridge node needs to be able to create a proof for any UTXO at any time, with low latency.  This seems infeasible with accumulators based on groups of unknown order, as the computational requirements scale up with the number of possible proofs.  With the Utreexo accumulator, a bridge node has no extra computational requirement, as verifying the proof for a block updates all the remaining proofs "for free".
+
+Some other downsides to non-hash based designs are that some use trusted setups (but there are those that don't), would introduce new cryptographic assumptions, or that they are not quantum safe.  Those downsides are probably manageable and worth it for the great reduction in proof size.  The real problem is the huge CPU time needed to update all proofs with other accumulator designs that we've seen.
+
+If there are other accumulator designs that do allow an efficient bridge node, let us know!  We might have to scrap the whole Utreexo accumulator design, but that's actually OK; most of the work in Utreexo is not in the accumulator itself, but in getting bitcoin to work with an accumulator instead of a UTXO set.
+
+
+
+Why use the utreexo merkle-tree-like accumulator instead of sparse merkle trees?
+
+Locality.
+
+Most spends in bitcoin are from recently created UTXOs.  A sparse tree design would work, and might be somewhat simpler in a few places, but would result in significantly larger proofs and worse caching performance.  In the utreexo accumulator design, when a new block adds UTXOs, those UTXOs all go to the bottom right of the forest.  When the next block deletes UTXOs, most of those UTXOs are from the bottom right, and their proofs overlap at very low heights in the forest.  With a sparse Merkle tree, new UTXOs would be inserted uniformly throughout the tree, and proofs would overlap higher up, leading to larger proofs that take more hashing to verify.
