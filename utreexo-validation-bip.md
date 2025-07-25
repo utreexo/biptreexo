@@ -94,7 +94,7 @@ We use tagged hashes for the hashes committed in the accumulator for versioning
 purposes. This is added so that if there are changes in the preimage of the
 hash, the version tag helps to avoid misinterpretation.
 
-The Utreexo version tag is the SHA512 hash of the string `UtreexoV1`, which is represented as the slice
+The Utreexo version tag is the SHA512 hash of the string `UtreexoV1`, which is represented as the vector
 `[85 116 114 101 101 120 111 86 49]` and hex `0x5574726565786f5631`.  (The resulting 64 byte output is
 `5b832db8ca26c25be1c542d6cceddda8c145615cff5c35727fb3462610807e20ae534dc3f64299199931772e03787d18156eb3151e0ed1b3098bdc8445861885`).
 
@@ -286,12 +286,19 @@ heights are: 209,921, 490,897, and 1,983,702.
 
 Up until block 209,921 the BIP-0030 checks are performed for non-Utreexo nodes.
 Since Utreexo nodes only keep the UTXO set commitment, it's not possible to
-perform the `BIP-0030` check.
+perform the `BIP-0030` check. In theory, those blocks can't be reorged, because
+of checkpoints, that goes back to block height 295,000 with the block hash
+`00000000000000004d9b4ef50f0f9d686fd69db2e03af35a100370c64632a983`. Any chain that
+doesn't include this block at height 295,000 isn't valid as removing this check
+would be a hard-fork. We note, however, that after version `0.30`, Bitcoin Core
+will remove the checkpoints[^1], as they are not needed anymore to prevent attacks
+against nodes during Initial Block Download. This is effectively a hard-fork,
+that will probably never actually happen, however.
 
 Block 1,983,702 is the first block that Utreexo nodes would be in danger of a
 consensus failure due to the inability to perform the BIP-0030 checks. However,
 this block will happen in roughly 21 years from now, and some mitigations have been
-proposed [^1].
+proposed [^2].
 
 ### Historical BIP-0030 violations
 
@@ -316,7 +323,8 @@ UTXO created at block height 91,812.
 
 ## Reference Implementation
 
-[Utreexod](https://github.com/utreexo/utreexod): Utreexo's reference implementation
+[Utreexod](https://github.com/utreexo/utreexod): A full node implementation with Utreexo support, written in Golang.
+[Floresta](https://github.com/vinteumorg/floresta): A lightweight Utreexo client, written in Rust.
 
 ## Backward Compatibility
 
@@ -328,4 +336,5 @@ not a soft-fork and does not require any changes to the existing Bitcoin
 
 ## References
 
-[^1]: https://delvingbitcoin.org/t/great-consensus-cleanup-revival/710
+[^1]: https://groups.google.com/g/bitcoindev/c/qyId8Yto45M
+[^2]: https://delvingbitcoin.org/t/great-consensus-cleanup-revival/710
