@@ -196,7 +196,9 @@ A compact leaf data is defined as:
 
 For some script types (e.g. `ScriptHash`, `PubkeyHash`, `WitnessScriptHash`, `WitnessPubkeyHash`) the actual locking condition is not in the scriptPubkey, but a hash of it.
 The script which is evaluated is provided as an element of the scriptSig or witness data.
+
 Therefore, we can safely just omit the locking script hash from the UTXO data and reconstruct it from the witness or scriptSig.
+
 A Reconstructable Script is a tagged union that lets nodes recreate the script without necessarily providing redundant information.
 If we can reconstruct the committed hash from the transaction data, we just say which type should we expect.
 Only if the actual script cannot be reconstructed from transaction data, like in the case of taproot outputs, we send the actual script.
