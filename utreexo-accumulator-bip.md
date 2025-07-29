@@ -1,41 +1,87 @@
-# Abstract
-This document defines the process for representing, updating and verifying proofs for the Utreexo accumulator.
+```
+BIP: TBD
+Title: Utreexo Accumulator Specification
+Authors: Tadge Dryja <TBD>
+         Calvin Kim <calvin@calvinkim.info>
+         Davidson Souza <bip@dlsouza.dev>
+Comments-URI: TBD
+Status: Draft
+Type: Specification
+Created: 2025-06-18
+License: BSD-3-Clause
+Depends: BIP-???? (Utreexo Accumulator Specification)
+```
 
-# License
+## Abstract
 
-This BIP is licensed under the BSD 3-clause license.
+This BIP describes the Utreexo accumulator and it's operations. It lays down how to update the
+accumulator as well as how to generate and verify inclusion proofs for elements in the accumulator.
 
-# Motivation 
+## Motivation
 
-The Bitcoin UTXO set continues to grow, currently over 10GB.  While much less than the size
-of the blockchain, UTXO set growth is only bounded by the 1MB un-discounted block size limit.
-This is problematic as every fully validating node needs to store the entire UTXO set. 
-The Utreexo accumulator removes this requirement, allowing fully validating nodes to store
-a small cryptographic accumulator of the UTXO set instead of the entire set.  
-The accumulator requires storage of O(log_2(N)) where N is the number of UTXOs.
+The Bitcoin network is composed of a set of nodes that validate blocks and
+transactions as they are received. These nodes need to keep track of the current state of the network in order to
+fulfill their role. Most importantly, they must maintain a record of all coins that
+have been created but not yet spent—a collection known as the UTXO set.
 
-This BIP document describes the design of the accumulator structure used in Utreeexo, which uses the accumulator to commit UTXO data into leaves of the accumulator.  The reset of this document 
+This set is typically stored in a database that must be accessed frequently and cannot
+be pruned. As a result, the cost of running a node is directly tied to the size
+of the UTXO set. Since it can grow indefinitely—bounded only by block size—it represents a
+long-term scalability concern.
 
-# Design
+Utreexo is a dynamic accumulator that enables the UTXO set to be represented in just a few kilobytes,
+by requiring peers to provide additional proof data to verify the inclusion of a UTXO in the
+accumulator. This allows for the construction of extremely lightweight nodes capable of performing
+the same validation as a full node, without the need to store the entire UTXO set.
 
-An accumulator is a data structure that allows for the compact representation of a set. The Utreexo
-accumulator uses an append only merkle tree design found in [^1] and extends the work to make deletions
-possible while increasing accumulator storage size to O(log_2(N)).
+This BIP defines how the Utreexo accumulator works, defining the data structure and algorithms used to
+maintain the accumulator, as well as how to generate and verify inclusion proofs for elements in the accumulator.
+It does not define how the accumulator is used in the Bitcoin protocol, but rather provides a foundation for future
+BIPs that will define how to integrate Utreexo into Bitcoin validation and P2P network protocol.
+
+## License
+
+This document is licensed under the BSD-3-Clause license.
+
+## Preliminaries
+
+An accumulator is a cryptographic data structure that allows for the compact representation of a set,
+enabling efficient membership proofs without requiring storage of the entire set. In the context of Utreexo,
+the accumulator tracks the current set of unspent transaction outputs (UTXOs).
+
+The Utreexo accumulator is based on an append-only Merkle tree design introduced in [^1],
+which provides logarithmic-sized inclusion proofs. Utreexo extends this design to support dynamic updates,
+specifically enabling deletions from the set—a requirement for tracking UTXO spends in Bitcoin.
+To accommodate this, Utreexo increases the storage requirement for the accumulator state to O(log₂(N)),
+where N is the number of elements ever added to the set, while still keeping proof sizes small and verification efficient.
 
 ## Merkle Forest
 
-The Utreexo accumulator consists of a set of Merkle trees: perfect (2^n element) binary trees containing 32 byte hashes at every location in the tree.  The elements to be stored appear at the bottom hashes of the tree and we refer to as "leaves", the top hash of the tree is the "root" and hashes not on the top or bottom rows are "intermediate".  Any integer number of N elements can be represented by, on average, log_2(N)/2 trees.  For example, a forest with 5 elements would consist of a tree of 4 elements and a tree of 1 element.  A forest of 8 elements would only need a single tree as 8 is a power of 2.
+The Utreexo accumulator consists of a set of Merkle trees: specifically, perfect binary trees with $2^n$ elements,
+where each node in the tree contains a 32-byte hash. The elements being stored appear at the leaves—the bottom layer of the tree.
+The topmost node is referred to as the "root," while nodes located between the leaves and the root are called "intermediate nodes."
 
-Looking at the binary representation of the number of elements to store, the number of trees needed is the number of 1-bits.
+Any integer number of elements ($N$) can be represented as a forest of such trees. On average, a set of N elements will require
+approximately $\frac{log₂(N)}{2}$ trees. The number and sizes of trees are determined by the binary representation of $N$:
+each 1-bit corresponds to a tree, and its position in the binary encoding determines the size of that tree.
 
-For example, the decimal number 21, in binary, is 0b10101.  There are 3 1's in 0b10101, thus 3 trees are needed in the forest.  The sizes of the trees map to the bit positions in the binary number as well: 0b10101 will have a 16-element tree, no 8 element tree, a 4 element tree, no 2 element tree, and a 1 element tree.
+For example, a forest with 5 elements (binary `0b101`) would consist of two trees: one with 4 elements (representing the 2nd bit)
+and one with 1 element (representing the 0th bit). A forest with 8 elements (`0b1000`) would require only a single 8-element tree,
+as 8 is a power of 2.
 
-## Positions in the forest
+More generally, for any N, the number of trees equals the number of set bits (1s) in the binary representation of N.
+The size of each tree corresponds to the power of two represented by the position of each set bit.
+For example, the decimal number 21 (binary `0b10101`) contains three 1-bits, meaning three trees are needed in the forest:
+a 16-element tree ($2^4$), a 4-element tree ($2^2$), and a 1-element tree ($2^0$), with gaps at the 8-element ($2^3$)
+and 2-element ($2^1$) positions.
 
-Each of the hashes in the forest can be referred by an integer label.
-This labeling is a convention we find easiest to use but does not directly affect the design of the accumulator; other labelling systems could also work and be translated to this one.
+Each of the hashes in the forest can be referred by an integer label. This labeling is a convention we find easiest
+to use but does not directly affect the design of the accumulator; other labelling systems could also work and be
+translated to this one.
 
-We label positions starting at 0 on the bottom left, incrementing as we traverse the bottom row from left to right, and then continue on to higher rows.  There may be gaps in the label numbers when moving up a row; the label numbers are "padded out" to the next perfect tree that could encompass the entire forest.
+We label positions starting at `0` on the bottom left, incrementing as we traverse the bottom row from left to right,
+and then continue on to higher rows. There may be gaps in the label numbers when moving up a row; the label
+numbers are "padded out" to the next perfect tree that could encompass the entire forest.
 
 For example, a forest with 8 leaves will have a single tree and positions will be labeled like this:
 
@@ -49,7 +95,7 @@ For example, a forest with 8 leaves will have a single tree and positions will b
 00  01  02  03  04  05  06  07
 ```
 
-While a forest with 7 leaves will 
+While a forest with 7 leaves will look like this:
 
 ```
 
@@ -62,15 +108,8 @@ While a forest with 7 leaves will
 ```
 
 
-For example, an accumulator state with N=3 will look like so:
-
-
-It's possible to have less than 2^N elements in the accumulator. For an accumulator state where
-N=3 but with 6 elements will look like so:
-
-
-When adding another leaf to the accumulator when it's already allocated 2^N leaves will result in
-the accumulator resizing to hold 2^(N+1) leaves. For example, when adding a leaf to the accumulator
+When adding another leaf to the accumulator when it's already allocated $2^N$ leaves will result in
+the accumulator resizing to hold $2^{N+1}$ leaves. For example, when adding a leaf to the accumulator
 state here:
 
 ```
@@ -111,13 +150,6 @@ The new accumulator with all the positions:
 00  01  02  03  04  05  06  07  08  09  10  11  12  13  14  15
 ```
 
-struct getBlockSummaries {
-	pos uint64
-}
-
-
-response:
-proof, payload
 # Definitions
 
 - `hash` refers to a vector of 32 byte arrays.
@@ -126,12 +158,13 @@ proof, payload
 - `root` refers to the top `hash` in a tree in the `acc`.
 
 - `acc` is comprised of 2 fields:
-  - `roots` refers to the roots of the merkle trees. Represented as `[]hash`.
+  - `roots` refers to the roots of the Merkle Trees. Represented as `[]hash`.
   - `numleaves` refers to the number of total leaves added to the accumulator. Represented as uint64.
 
 - `proof` is an inclusion proof for elements in the accumulator. It's comprised of two fields:
   - `targets` are the positions of the elements being proven. Represented as a vector of uint64.
-  - `proof` are the hashes needed to hash the roots. Represented as a `[]hash`. `proof` MUST be in ascending order. The proof is considered invalid otherwise.
+  - `proof` are the hashes needed to hash the roots. Represented as a `[]hash`. `proof` MUST be in ascending order by the node positions.
+    The proof is considered invalid otherwise.
 
 # Specification
 
@@ -139,63 +172,155 @@ The hash function SHA512/256[^2] is used for the hash operations in the accumula
 
 An Utreexo accumulator implementation MUST support these 3 operations: Addition, Verification, and Deletion.
 
-## Utility functions
+## Utility Functions
 
-The following utility functions are required for the accumulator operations:
+The following utility functions are required for performing accumulator operations:
 
-*parent_hash(left, right)* is the concatenation and hash of two child hashes. If either of the child hashes are nil, the returned result is just the non-nil child by itself.
+**parent_hash(left, right):** Returns the hash of the concatenation of two child hashes (`left` and `right`).
+If either child is `nil`, the result is simply the non-`nil` child (treated as if the tree has a single child at that position).
+if both children are `nil`, the result is `nil`.
 
-*treerows(numleaves)* is a function that returns the minimum number of bits needed to represent `numleaves`-1. Returns 0 if `numleaves` is 0.
+Implementation:
 
-*is_right_sibling(position)* returns true if the given position is on the right side. If the least significant bit is turned on, the position is on the right side.
+```python
+def parent_hash(left: bytes, right: bytes) -> bytes:
+    if left is None: return right
+    if right is None: return left
+    if right is None and left is None: return None
 
-*right_sibling(position)* returns the position of the sibling on the right side. It returns the given position if the position is already on the right side. Turning on the least significant bit returns the position on the right side.
-
-*parent(position, total_rows)* is a function that returns the parent position of the given position in an accumulator with leaf count of `numleaves`.
-```
-(position >> 1) | (1 << total_rows)
-```
-
-*root_position(numleaves, row, total_rows)* is a function that returns the position of the root at the given row. Will return a garbage value if there's no root at the row.
-```
-mask = (2 << total_rows) - 1
-before = numleaves & (mask << (row + 1))
-shifted = (before >> row) | (mask << (total_rows + 1 - row))
-shifted & mask
+    return sha512_256(left + right)
 ```
 
-*root_present(numleaves, row)* returns if there's a root at the given row in an accumulator with leaf count of `numleaves`.
-```
-numleaves & (1 << row) != 0
+**treerows(numleaves):** Returns the minimum number of bits required to represent `numleaves - 1`. This corresponds to the height of the largest tree in the forest. Returns `0` if `numleaves` is `0`.
+
+Implementation:
+
+```python
+def treerows(numleaves: int) -> int:
+    if numleaves == 0: return 0
+    return (numleaves - 1).bit_length()
 ```
 
-*detect_row(position, total_rows)* is a function that returns which row the given position is at in an accumulator with row count of total_rows.
+**is_right_sibling(position):** Returns `true` if the given `position` corresponds to a right sibling.
+A position is on the right side if its least significant bit (LSB) is set (i.e., `position & 1 == 1`).
+And it is the right sibling of a **given node** if all bits but the LSB are identical.
+
+Implementation:
+
+```python
+def is_right_sibling(position: int) -> bool:
+    return (position & 1) == 1
 ```
+
+**right_sibling(position):** Returns the position of the right sibling of the given `position`.
+If `position` is already on the right side, it returns `position` unchanged.
+Otherwise, turning on the least significant bit moves the position to the right side.
+
+Implementation:
+
+```python
+def right_sibling(position: int) -> int:
+    return position | 1
+```
+
+**sibling(position):** Returns the position of the sibling of the given `position`.
+If `position` is on the right side, it returns the left sibling by turning off the least significant bit.
+If `position` is on the left side, it returns the right sibling by turning on the least significant bit.
+
+Implementation:
+
+```python
+def sibling(position: int) -> int:
+    return position ^ 1
+```
+
+**parent(position, total_rows):** Returns the parent position of the given `position` in an accumulator with `total_rows` tree rows.
+
+Implementation:
+
+```python
+def parent(position: int, total_rows: int) -> int:
+    return (position >> 1) | (1 << total_rows)
+```
+
+**root_position(numleaves, row, total_rows):** Returns the position of the root at the specified `row`
+in an accumulator with `numleaves` leaves and `total_rows` rows. Returns an undefined (garbage) value if
+no root exists at the given row. This can be calculated as:
+
+Implementation:
+
+```python
+def root_position(numleaves: int, row: int, total_rows: int) -> int:
+    if row < 0 or row > total_rows:
+        raise ValueError("Row must be between 0 and total_rows inclusive")
+
+    mask = (2 << total_rows) - 1
+    before = numleaves & (mask << (row + 1))
+    shifted = (before >> row) | (mask << (total_rows + 1 - row))
+    shifted & mask
+```
+
+**root_present(numleaves, row):** Returns `true` if there is a root at the specified `row`
+in an accumulator with `numleaves` leaves.
+
+Implementation:
+
+```python
+def root_present(numleaves: int, row: int) -> bool:
+    return numleaves & (1 << row) != 0
+```
+
+**detect_row(position, total_rows):** Returns the row at which the given `position` resides
+in an accumulator with `total_rows` rows.
+
+Implementation:
+
+```python
 for row in range(total_rows, -1, -1):
     rowbit = 1 << row
     if rowbit & position == 0: return total_rows-row
 ```
 
-*isroot(position, numleaves, total_rows)* returns if the position is a root in an accumulator with leaf count of `numleaves` and a row count of total_rows.
-```
-row = detect_row(position, total_rows)
-root_present(numleaves, row) && position == root_position(numleaves, row, total_rows)
+**isroot(position, numleaves, total_rows):** Returns `true` if the given `position` corresponds to a root
+in an accumulator with `numleaves` leaves and `total_rows` rows.
+It has the following precondition:
+
+Implementation:
+
+```python
+def isroot(position: int, numleaves: int, total_rows: int) -> bool:
+    row = detect_row(position, total_rows)
+    return root_present(numleaves, row) && position == root_position(numleaves, row, total_rows)
 ```
 
-*getrootidx(numleaves, position)* returns the index of the root in the accumulator state that will be modified when deleting the given position.
-```
-idx = 0
-for row in range(tree_rows(numleaves), -1, -1):
-    if not root_present(numleaves, row):
-        continue
-    pos = position
-    for _ in range(detect_row(position, tree_rows(numleaves)), row): pos = parent(pos, tree_rows(numleaves))
-    if isroot(pos, numleaves, tree_rows(numleaves)):
-        return idx
-    idx += 1
+**getrootidx(numleaves, position):** Returns the index (within the accumulator's root list)
+of the root that will be affected when deleting the given `position`.
+
+Implementation:
+
+```python
+def getrootidx(numleaves: int, position: int) -> int:
+    idx = 0
+    for row in range(tree_rows(numleaves), -1, -1):
+        if not root_present(numleaves, row):
+            continue
+        pos = position
+        for _ in range(detect_row(position, tree_rows(numleaves)), row): pos = parent(pos, tree_rows(numleaves))
+        if isroot(pos, numleaves, tree_rows(numleaves)):
+            return idx
+        idx += 1
 ```
 
-*getrootidxs(numleaves, positions)* returns the indexes of the roots in the accumulator state that will be modified when deleting the given positions. Wrapper function around *getrootidx*.
+**getrootidxs(numleaves, positions):** Returns a list of indexes corresponding to the roots in the accumulator state
+that will be affected when deleting the given set of `positions`.
+This is a wrapper around **getrootidx**, applied to each position in the input list.
+
+Implementation:
+
+```python
+def getrootidxs(numleaves: int, positions: [int]) -> [int]:
+    return [getrootidx(numleaves, pos) for pos in positions]
+```
 
 ### CalculateRoots
 
@@ -216,7 +341,7 @@ The calculate roots algorithm is defined as CalculateRoots(numleaves, `[]hash`, 
 - Sort `proof.targets`.
 - Loop until `proof.targets` are empty:
   - Pop off the first target in `proof.targets`. Pop off the associated `hash` as well.
-  - If the the target is a root, we append the current position's `hash` to the calculated_roots vector and continue.
+  - If the target is a root, we append the current position's `hash` to the calculated_roots vector and continue.
   - Check if the next target in `proof.targets` is the right sibling of the current target. If it is, grab its hash as the sibling hash. Otherwise the next hash in `proof.proof` is the sibling hash. Raise error if `proof.proof` is empty.
   - Figure out if the sibling hash is on the left or the right.
   - Apply *parent_hash* to the current position's `hash` and the sibling `hash` with regards to their positioning.
@@ -227,7 +352,7 @@ The calculate roots algorithm is defined as CalculateRoots(numleaves, `[]hash`, 
 
 The algorithm implemented in python:
 
-```
+```python
 def calculate_roots(numleaves: int, dels: [bytes], proof: Proof) -> [bytes]:
     if not proof.targets: return []
     if len(proof.targets) != len(dels): return []
@@ -263,7 +388,7 @@ def calculate_roots(numleaves: int, dels: [bytes], proof: Proof) -> [bytes]:
 ## Addition
 
 Addition adds a leaf to the accumulator. The added leaves are able to be verified of their
-existance with an inclusion proof.
+existence with an inclusion proof.
 
 Inputs:
   - `acc`.
@@ -273,14 +398,15 @@ The Addition algorithm Add(`acc`, `hash`) is defined as:
 
 - From row 0 to and including *treerows(acc.numleaves)*
   - Break if there's no root at this row.
-  - *parent_hash* existing root at row with `hash`.
+  - remove the last root from `acc.roots`.
+    - Calculate the parent hash of the removed root and the `hash` to be added using *parent_hash*.
   - Make the result from *parent_hash* the new `hash`.
 - Increment `acc.numleaves` by 1.
 - Append `hash` to acc.roots.
 
 The algorithm implemented in python:
 
-```
+```python
 def add(self, hash: bytes):
     for row in range(tree_rows(self.numleaves)+1):
         if not root_present(self.numleaves, row): break
@@ -308,7 +434,7 @@ The Verification algorithm Verify(`acc`, `[]hash`, `proof`) is defined as:
 
 The algorithm implemented in python:
 
-```
+```python
 def verify(self, dels: [bytes], proof: Proof):
     if len(dels) != len(proof.targets):
         raise("len of dels and proof.targets differ")
@@ -341,7 +467,7 @@ The Deletion algorithm Delete(`acc`, `Proof`) -> `acc` is defined as:
 
 The algorithm implemented in python:
 
-```
+```python
 def delete(self, proof: Proof):
     modified_roots = calculate_roots(self.numleaves, None, proof)
     root_idxs = getrootidxs(self.numleaves, proof.targets)
@@ -349,7 +475,62 @@ def delete(self, proof: Proof):
         self.roots[idx] = modified_roots[i]
 ```
 
-# Reference Implementations
+## Rationale
+
+**Why use a hash-based accumulator instead of something more powerful (e.g., RSA accumulators[^3], class groups[^4], etc.)?**
+
+While RSA accumulators and similar constructions offer significant advantages in proof size—often allowing a
+single proof to cover an entire block's worth of UTXOs—the trade-offs in proof generation cost and latency are
+substantial. In RSA-based designs, creating a proof for any given UTXO at arbitrary times can be computationally
+intensive, especially as the number of UTXOs grows.
+
+Utreexo's design is driven by the need for Bridge Nodes: nodes that maintain backward compatibility with existing
+Bitcoin nodes and wallets that do not use Utreexo. A bridge node must be able to generate an inclusion proof for
+any UTXO at any time, with low latency, to support lightweight clients and peer nodes.
+
+With the Utreexo hash-based accumulator, bridge nodes can produce such proofs efficiently. Proofs are derived
+directly from the current accumulator state, and crucially, when a bridge node processes and verifies a new
+block, it can update its state such that all previously known proofs remain valid or are efficiently updatable
+with no additional per-proof recomputation cost. In other words, proof maintenance happens "for free"
+as part of normal block validation.
+
+By contrast, group-of-unknown-order accumulators (like RSA or class groups) typically require significant
+computation to update all outstanding proofs whenever the accumulator changes, making the bridge node use
+case effectively infeasible at Bitcoin scale.
+
+There are additional disadvantages to non-hash-based accumulators, including:
+
+ - Some require trusted setups (though not all).
+ - They introduce new cryptographic assumptions, which Bitcoin users may be hesitant to adopt.
+ - Many are not quantum-safe, whereas hash-based designs like Utreexo inherit Bitcoin's existing reliance on hash functions.
+
+That said, the most critical blocker remains the computational overhead of proof maintenance at scale.
+
+If future accumulator designs emerge that allow low-latency, per-UTXO proof generation for arbitrary historical
+elements (without excessive computation), we would gladly reconsider. Much of the engineering effort behind
+Utreexo lies not in the specific accumulator design, but in integrating any accumulator cleanly into
+Bitcoin's validation and P2P protocol layers.
+
+**Why use the Utreexo Merkle-tree-like accumulator instead of a sparse Merkle tree[^5]?**
+
+While sparse Merkle trees are a functional alternative, they introduce significant inefficiencies in proof size and caching behavior.
+
+Bitcoin transaction patterns exhibit strong locality: most spends occur from recently created UTXOs. Utreexo's
+forest-based Merkle accumulator takes advantage of this. Newly created UTXOs from a block are appended to
+the bottom right of the forest, keeping them clustered.
+
+As a result, when the next block spends UTXOs, the deletions often target elements also near the bottom right, and
+their proofs tend to overlap at very low tree heights, minimizing proof size and hashing cost.
+
+By contrast, a sparse Merkle tree would spread new UTXOs uniformly across a massive keyspace, making proof paths
+diverge much higher in the tree. This would lead to larger proof sizes, and worse cache locality, increasing computational
+and I/O costs for proof generation and verification.
+
+While sparse trees may simplify some aspects of implementation, the proof size and performance characteristics of
+Utreexo’s locality-aware forest design make it better suited for Bitcoin’s UTXO model and transaction patterns.
+
+
+## Reference Implementations
 
 In Python - https://github.com/utreexo/pytreexo
 
@@ -357,6 +538,11 @@ In Rust - https://github.com/mit-dci/rustreexo
 
 In Go - https://github.com/utreexo/utreexo
 
-[^1]: https://eprint.iacr.org/2015/718
-[^2]: https://eprint.iacr.org/2010/548.pdf
+## References
 
+[^1]: Reyzin, Leonid, and Sophia Yakoubov. "Efficient asynchronous accumulators for distributed PKI." International Conference on Security and Cryptography for Networks. Cham: Springer International Publishing, 2016. https://eprint.iacr.org/2015/718
+[^2]: Gueron, Shay, Simon Johnson, and Jesse Walker. "SHA-512/256." 2011 Eighth International Conference on Information Technology: New Generations. IEEE, 2011. https://ieeexplore.ieee.org/abstract/document/5945260
+[^3]: Josh Benaloh and Michael de Mare, "One-way accumulators: A decentralized alternative to digital signatures," EUROCRYPT 1993.
+https://link.springer.com/chapter/10.1007/3-540-48285-7_24
+[^4]: Boneh, Dan, Benedikt Bünz, and Ben Fisch. "Batching techniques for accumulators with applications to IOPs and stateless blockchains." Advances in Cryptology–CRYPTO 2019: 39th Annual International Cryptology Conference, Santa Barbara, CA, USA, August 18–22, 2019, Proceedings, Part I 39. Springer International Publishing, 2019.
+[^5]: Szydlo, Michael. "Merkle tree traversal in log space and time." International Conference on the Theory and Applications of Cryptographic Techniques. Berlin, Heidelberg: Springer Berlin Heidelberg, 2004.
