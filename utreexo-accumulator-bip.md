@@ -319,6 +319,73 @@ def getrootidxs(numleaves: int, positions: [int]) -> [int]:
     return [getrootidx(numleaves, pos) for pos in positions]
 ```
 
+The following utility functions are required for the P2P layer:
+
+**max_possible_pos_at_row(row, total_rows):** Returns the greatest position the row can have in the given total rows.
+
+Implementation:
+
+```python
+def max_possible_pos_at_row(row: int, total_rows: int) -> int:
+    mask = (2 << total_rows) - 1
+    return ((mask << (total_rows - row)) & mask) - 1
+```
+
+**is_root_position(position, num_leaves, row):** Returns if the given position is a root with the passed in num_leaves and row.
+
+```python
+def is_root_position(position: int, num_leaves: int, row: int) -> bool:
+    root_present = (num_leaves & (1 << row)) != 0
+    root_pos = root_position(num_leaves, row, tree_rows(num_leaves))
+    return root_present and root_pos == position
+```
+
+**proof_positions(targets, num_leaves):** Returns all the positions of the proof hashes that are required to validate the given targets.
+
+```python
+def proof_positions(targets: [int], num_leaves: int) -> [int]:
+    targets.sort()
+
+    next_targets = []
+    proof_positions = []
+
+    total_rows = tree_rows(num_leaves)
+    for row in range(total_rows + 1):
+        i = 0
+        while i < len(targets):
+            target = targets[i]
+
+            if target > max_possible_pos_at_row(row, total_rows):
+                i += 1
+                continue
+
+            if row != detect_row(target, total_rows):
+                i += 1
+                continue
+
+            if is_root_position(target, num_leaves, row):
+                i += 1
+                continue
+
+            if i + 1 < len(targets) and right_sib(target) == targets[i + 1]:
+                parent_pos = parent(target, total_rows)
+                next_targets.append(parent_pos)
+                targets[i] = parent_pos
+                i += 2  # skip the sibling
+                continue
+
+            # Sibling is a needed proof position
+            proof_positions.append(sibling(target))
+            parent_pos = parent(target, total_rows)
+            next_targets.append(parent_pos)
+            targets[i] = parent_pos
+            i += 1
+
+        targets.sort()
+
+    return proof_positions
+```
+
 ### CalculateRoots
 
 Both the Verification and Deletion operations depend on the Calculate Roots function.
