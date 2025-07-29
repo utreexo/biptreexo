@@ -1,7 +1,7 @@
 ```
 BIP: TBD
 Title: Utreexo Accumulator Specification
-Authors: Tadge Dryja <TBD>
+Authors: Tadge Dryja <rx@awsomnet.org>
          Calvin Kim <calvin@calvinkim.info>
          Davidson Souza <bip@dlsouza.dev>
 Comments-URI: TBD
