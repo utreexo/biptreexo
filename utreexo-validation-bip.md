@@ -2,7 +2,7 @@
 BIP: TBD
 Title: Utreexo - Validation Layer
 Authors: Tadge Dryja <rx@awsomnet.org>
-         Calvin Kim <calvin@calvinkim.info>
+         Calvin Kim <bip@calvinkim.info>
          Davidson Souza <bip@dlsouza.dev>
 Comments-URI: TBD
 Status: Draft
