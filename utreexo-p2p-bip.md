@@ -245,6 +245,7 @@ The TTL value provides information to determine which leaves should be cached an
 
 `MSG_UTREEXO_PROOF` is all the data required for a CSN or archive node using the Utreexo accumulators to validate a Bitcoin block.
 
+Its `cmdString` for P2PV1 is `uproof`.
 Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `29`.
 
 | Field                          | Type                         | Description                                                                                                                                 |
@@ -267,6 +268,7 @@ While each leaf data represent a UTXO in a given block, not all are added as per
 
 `MSG_GET_UTREEXO_PROOF` is a message to request the inclusion proof for a given block.
 
+Its `cmdString` for P2PV1 is `getuproof`.
 Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `30`.
 
 | Field                     | Type                        | Description                                                        |
@@ -287,6 +289,7 @@ With these positions, we can set the bit in the bitmap for the hashes we require
 
 `MSG_UTREEXO_TTLS` is the requested group of Utreexo TTLs that includes the proof hashes needed to validate that the given TTLs were committed in the provided binary.
 
+Its `cmdString` for P2PV1 is `uttls`.
 Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `31`.
 
 | Field                      | Type                                | Description                                   |
@@ -300,6 +303,7 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 
 `MSG_GET_UTREEXO_TTLS` is used to request a MSG_UTREEXO_TTLS message.
 
+Its `cmdString` for P2PV1 is `getuttls`.
 Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `32`.
 
 | Field                | Type   | Description                                                                                                          |
@@ -312,6 +316,7 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 
 `MSG_UTREEXO_SUMMARY` is the data needed to calculate the missing merkle forest positions required to validate a given block.
 
+Its `cmdString` for P2PV1 is `usummary`.
 Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `33`.
 
 | Field                      | Type                    | Description                                                                                                      |
@@ -325,6 +330,7 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 
 `MSG_UTREEXO_TX` is the current Bitcoin transaction appended with the inclusion proof.
 
+Its `cmdString` for P2PV1 is `utreexotx`.
 Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `34`.
 
 | Field                      | Type                         | Description                                                                                                                                                                                                      |
@@ -345,6 +351,52 @@ if IsUnconfirmed {
 ```
 
 This step is required because if the unconfirmed UTXO is not explicitly marked, then a malicious peer can omit the leaf data for a confirmed UTXO and mislead us into believing that the transaction is an orphan.
+
+### MSG_UTREEXO_ROOT
+
+`MSG_UTREEXO_ROOT` is the utreexo accumulator state at a given height with a proof to a utreexo accumulator of the utreexo roots.
+
+Its `cmdString` for P2PV1 is `uroot`.
+Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `35`.
+
+| Field                      | Type                         | Description                                                                                                                                                                                                      |
+|----------------------------|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| numleaves                  | varint                       | The number of leaves that was ever added to the accumulator at this block height. See [numleaves](./utreexo-accumulator-bip.md#Definitions)                                                                      |
+| target                     | varint                       | The position of the utreexo root in the optional accumulator of the utreexo roots                                                                                                                                |
+| blockhash                  | 32 byte vector               | The blockhash for this utreexo accumulator state                                                                                                                                                                 |
+| length of the root hashes  | varint                       | The length of the root hashes                                                                                                                                                                                    |
+| root hashes                | vector of 32 byte hashes     | The utreexo roots for the UTXO set at the blockhash. See [roots](./utreexo-accumulator-bip.md#Definitions)                                                                                                       |
+| length of the proof hashes | varint                       | The length of the proof hashes                                                                                                                                                                                   |
+| proof hashes               | vector of 32 byte hashes     | The proof hashes needed to validate with the pre-committed utreexo accumulator of the utreexo roots                                                                                                              |
+
+This message is for implementing an out-of-order block validation node[^2] or softchains[^3].
+
+Because the size of the state needed to validate blocks is so small with Utreexo, nodes can perform IBD in parallel and out of order.
+
+For example, a computer could divide the task of validating 800,000 blocks into 100 tasks of 8,000 blocks each: blocks 1 through 800, 800 through 1600, 1600 through 2400, and so on.
+
+In order start the 1600 through 2400 IBD task, however, the node should know what the state of the utxo set is at block 1600, so that it can validate and modify the accumulator.
+
+In order to do this, the binary can provide "linkup hints", where the state of the accumulator is given for a desired block hash.
+
+While giving the state of the system might seem at first glance to be introducing a trust assumption, these are not trusted states.
+The node performing IBD tries out the state given for a block height, but checks that when that state is reached from the thread "below" that it properly links up, with the accumulator state arrived at through full validation matching the state given.
+If that link up does not successfully happen, the IBD process should halt.
+
+These hints are statements of fact that are hard-coded into the program itself, and if they are false all bets are off about the program.
+
+Archive nodes create a forest of Linkup hints, so that they can prove, with respect to the Linkup forest roots in a node performing IBD, what their binary has claimed the utxo accumulator state to be at any block height.
+
+### MSG_GET_UTREEXO_ROOT
+
+`MSG_GET_UTREEXO_ROOT` is used to request a utreexo accumulator state at a given height.
+
+Its `cmdString` for P2PV1 is `geturoot`.
+Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `36`.
+
+| Field                      | Type                    | Description                                                                                                      |
+|----------------------------|-------------------------|------------------------------------------------------------------------------------------------------------------|
+| blockhash                  | 32 byte vector          | The hash of the block that the requested utreexo root message is for                                             |
 
 ## New Inventory Types
 
@@ -387,7 +439,7 @@ Used to indicate in a `getdata` message that a witness Utreexo tx is desired.
 We choose an arbitrary height `X` and go through each of `TTL info` in all the the `Utreexo TTL` values up until that height.
 
 If the TTL in the `TTL info` is greater than the [numleaves](./utreexo-accumulator-bip.md#Definitions) value of the Utreexo accumulator at the chosen height `X`, we reset the `death position` and the `TTL` values to their default of 0.
-Then these `Utreexo TTL` values are hashed with the hash function SHA512/256[^2] and added in height order to the commitment Utreexo accumulator.
+Then these `Utreexo TTL` values are hashed with the hash function SHA512/256[^4] and added in height order to the commitment Utreexo accumulator.
 
 Note that this commitment Utreexo accumulator is separate from the Utreexo accumulator being used to represent the UTXO set.
 
@@ -423,4 +475,6 @@ This change introduces a new primitive that doesn't interact with existing proto
 # References
 
 [^1]: https://en.wikipedia.org/wiki/Page_replacement_algorithm#The_theoretically_optimal_page_replacement_algorithm
-[^2]: https://eprint.iacr.org/2010/548.pdf
+[^2]: https://blog.bitmex.com/out-of-order-block-validation-with-utreexo-accumulators/
+[^3]: https://gist.github.com/RubenSomsen/7ecf7f13dc2496aa7eed8815a02f13d1#softchains-sidechains-as-a-soft-fork-via-proof-of-work-fraud-proofs
+[^4]: https://eprint.iacr.org/2010/548.pdf
