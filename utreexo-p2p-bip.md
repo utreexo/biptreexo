@@ -15,8 +15,8 @@ Depends: BIP-???? (Utreexo - Peer Services)
 # Abstract
 Utreexo creates a compact representation of the UTXO set that only takes a couple of kilobytes.
 When spending a transaction, one must provide an inclusion proof for the UTXOs being spent.
-This BIP defines the networking-layer changes needed to allow nodes to exchange the utreexo proofs.
-This document **does not** describe how to validate blocks and transactions using the provided data, check "Utreexo - Validation Layer" for more details.
+This BIP defines the networking-layer changes needed to allow nodes to exchange the inclusion proofs.
+This document **does not** describe how to validate blocks and transactions using the provided data, see [Utreexo - Validation Layer](./utreexo-validation-bip.md) for more details.
 
 # Motivation
 
@@ -125,20 +125,20 @@ The same block propagation with Utreexo nodes will look like so:
 2: Node B makes a getdata request for the block.
 3: Node B makes a getutreexoproof request for the block.
 4: Node A sends the block data to Node B.
-5: Node A sends the utreexo proof to Node B.
+5: Node A sends the inclusion proof to Node B.
 
 Note that while Node A sent the inv or the blockhash to Node B, Node B is free to ask for the Utreexo proof from a node other than Node A.
 This allows a Utreexo node to be notified of new blocks from non-Utreexo nodes.
 
 ## MSG_UTREEXO_SUMMARIES
 
-Since there's no PoW required for the utreexo proof, the block may be valid and the proof may be invalid.
-If the block header validation passed while the full block validation fails, Node B should request the utreexo proof from a different peer.
+Since there's no PoW required for the inclusion proof, the block may be valid and the proof may be invalid.
+If the block header validation passed while the full block validation fails, Node B should request the inclusion proof from a different peer.
 If the new proof and the block pass validation, we can conclude that Node A is malicious and ban the peer.
 
 ![Bandwidth Saving Legacy Block Propagation with Utreexo Nodes](images/bandwith-saving-legacy-block-propagation-with-utreexo-nodes.png)
 
-Since the utreexo proof is cached for each of the transaction in the mempool, it's possible to omit the proof hashes for the input utxos that we can already prove on our own.
+Since the inclusion proof is cached for each of the transaction in the mempool, it's possible to omit the proof hashes for the input utxos that we can already prove on our own.
 This method looks like so:
 
 1: Node A sends an inv message or a block header to Node B.
@@ -148,7 +148,7 @@ This method looks like so:
 5: Node B makes a getdata request for the block to Node A.
 6: Node B makes a getutreexoproof request for the block to Node A.
 7: Node A sends the block data to Node B.
-8: Node A sends the requested utreexo proof data to Node B.
+8: Node A sends the requested inclusion proof data to Node B.
 
 As with the getutreexoproof message, Node B is free to ask for the utreexoblocksummaries message from a node other than Node A.
 Since there's no commitment to anything in a utreexoblocksummaries message, the information given in it can be false.
@@ -240,7 +240,7 @@ The utreexo block summary is the data needed to calculate the missing merkle for
 
 | Field            | Type                         | Description                                                                                                                               |
 |------------------|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| blockhash        | 32 byte vector               | The hash of the block that this utreexo proof proves                                                                                      |
+| blockhash        | 32 byte vector               | The hash of the block that this inclusion proof proves                                                                                      |
 | proof hashes     | vector of 32 byte vectors    | The hashes requested by MSG_GET_UTREEXO_PROOF. MUST be in tree order                                                                      |
 | target locations | vector of uint64 values      | The utreexo merkle tree locations of the leaf datas. MUST be in blockchain order. MUST include all the locations or none of the locations |
 | leaf datas       | vector of compact leaf datas | The preimage of the committed utxos requested byte MSG_GET_UTREEXO_PROOF. MUST be in blockchain order. See compact leaf data for details  |
@@ -258,8 +258,8 @@ While each leaf data represent a utxo in a given block, not all are added as per
 
 | Field              | Type                   | Description                                                      |
 |--------------------|------------------------|------------------------------------------------------------------|
-| blockhash          | 32 byte vector         | The hash of the bitcoin block that we want the utreexo proof for |
-| include all        | boolean                | A boolean value to request all parts of the utreexo proof        |
+| blockhash          | 32 byte vector         | The hash of the bitcoin block that we want the inclusion proof for |
+| include all        | boolean                | A boolean value to request all parts of the inclusion proof        |
 | proof index bitmap | variable-length vector | A bitmap of the indexes the indexesf the leaf datas              |
 | leaf index bitmap  | variable-length vector | The preimage of the committed utxos. See compact leaf data       |
 
@@ -297,22 +297,29 @@ While each leaf data represent a utxo in a given block, not all are added as per
 ### MSG_UTREEXO_PROOF_HASH
 
 Defined as `6`.
+
 It's used in the `inv` and `getdata` messages to communicate positions in the Utreexo merkle forest.
+
 MUST be appened to another `invvect` of type `MSG_TX`, `MSG_WITNESS_TX`, `MSG_UTREEXO_TX`, or a `MSG_WITNESS_UTREEXO_TX`.
+
 Ignored if an `invvect` of type `MSG_UTREEXO_PROOF_HASH` is not pre-pended by any of the above 4 `invvect` types.
 
 ### MSG_UTREEXO_FLAG
 
-Defined as `1 << 24`, it can be set with `MSG_TX` and `MSG_WITNESS_TX` to indicate in `getdata` messages that a Utreexo tx is desired.
+Defined as `1 << 24`.
+
+It can be set with `MSG_TX` and `MSG_WITNESS_TX` to indicate in `getdata` messages that a Utreexo tx is desired.
 
 ### MSG_UTREEXO_TX
 
 Defined as `16777217` or `1 << 24 | 1`.
+
 Used to indicate in a `getdata` message that a utreexo tx is desired.
 
 ### MSG_WITNESS_UTREEXO_TX
 
 Defined as `1090519041` or `1 << 30 | 1 << 24 | 1`.
+
 Used to indicate in a `getdata` message that a witness utreexo tx is desired.
 
 ## Commitment scheme for ttl messages
@@ -340,8 +347,11 @@ We have a separate NODE_UTREEXO_ARCHIVE service bit as it's possible to get hist
 Example cases:
 
 Historial blocks + inclusion proofs for historical blocks + inclusion proofs for txs and new blocks: NODE_NETWORK | NODE_UTREEXO_ARCHIVE | NODE_UTREEXO 
+
 Latest 288 blocks + inclusion proofs for latest 288 blocks + inclusion proofs for txs and new blocks: NODE_NETWORK_LIMITED | NODE_UTREEXO 
+
 Inclusion proofs for txs and new blocks: NODE_UTREEXO 
+
 Inclusion proofs for historical blocks: NODE_UTREEXO_ARCHIVE
 
 # References
