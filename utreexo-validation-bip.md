@@ -1,5 +1,6 @@
 ```
 BIP: TBD
+Layer: Peer Services
 Title: Utreexo - Validation Layer
 Authors: Tadge Dryja <rx@awsomnet.org>
          Calvin Kim <bip@calvinkim.info>

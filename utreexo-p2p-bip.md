@@ -1,5 +1,6 @@
 ```
 BIP: TBD
+Layer: Peer Services
 Title: Utreexo - Peer Services
 Authors: Tadge Dryja <rx@awsomnet.org>
          Calvin Kim <bip@calvinkim.info>
