@@ -154,13 +154,10 @@ The new accumulator with all the positions:
 
 - `hash` refers to a vector of 32 byte arrays.
 - `[]hash` refers to a vector of `hash`.
-- `acc` refers to the Utreexo accumulator state.
-- `root` refers to the top `hash` in a tree in the `acc`.
-
-- `acc` is comprised of 2 fields:
+- `acc` refers to the Utreexo accumulator state. An `acc` is comprised of:
   - `roots` refers to the roots of the Merkle Trees. Represented as `[]hash`.
   - `numleaves` refers to the number of total leaves added to the accumulator. Represented as uint64.
-
+- `root` refers to the top `hash` in a tree in the `acc`.
 - `proof` is an inclusion proof for elements in the accumulator. It's comprised of two fields:
   - `targets` are the positions of the elements being proven. Represented as a vector of uint64.
   - `proof` are the hashes needed to hash the roots. Represented as a `[]hash`. `proof` MUST be in ascending order by the node positions.
@@ -184,9 +181,9 @@ Implementation:
 
 ```python
 def parent_hash(left: bytes, right: bytes) -> bytes:
+    if right is None and left is None: return None
     if left is None: return right
     if right is None: return left
-    if right is None and left is None: return None
 
     return sha512_256(left + right)
 ```
@@ -331,10 +328,10 @@ Both the Verification and Deletion operations depend on the Calculate Roots func
   - `[]hash` that are the hashes for the `proof.targets`.
   - `proof`.
 
-The passed in `[]hash` and `proof.targets` should be in the same order. The element at index i in []hashes should
-be the hash for element at index i in `proof.targets`. Otherwise the returned roots will be invalid.
+The passed in `[]hash` and `proof.targets` should be in the same order. The element at index `i` in `[]hashes` should
+be the hash for element at index `i` in `proof.targets`. Otherwise the returned roots will be invalid.
 
-The calculate roots algorithm is defined as CalculateRoots(numleaves, `[]hash`, `proof`) -> calculated_roots:
+The calculate roots algorithm is defined as `CalculateRoots(numleaves, []hash, proof) -> calculated_roots`:
 
 - Check if length of `proof.targets` is equal to the length of `[]hash`. Return early if they're not equal.
 - map `proof.targets` to their hash.
@@ -396,13 +393,13 @@ Inputs:
 
 The Addition algorithm Add(`acc`, `hash`) is defined as:
 
-- From row 0 to and including *treerows(acc.numleaves)*
+- From row 0 to and **including** `treerows(acc.numleaves)`
   - Break if there's no root at this row.
   - remove the last root from `acc.roots`.
     - Calculate the parent hash of the removed root and the `hash` to be added using *parent_hash*.
-  - Make the result from *parent_hash* the new `hash`.
+  - Make the result from `parent_hash` the new `hash`.
 - Increment `acc.numleaves` by 1.
-- Append `hash` to acc.roots.
+- Append `hash` to `acc.roots`.
 
 The algorithm implemented in python:
 
@@ -424,18 +421,19 @@ def add(self, hash: bytes):
   - `[]hash` that are the hashes for the `proof.targets`.
   - `proof`.
 
-The Verification algorithm Verify(`acc`, `[]hash`, `proof`) is defined as:
+The Verification algorithm `Verify(acc, []hash, proof) -> bool` is defined as:
 
 - Raise error if length of `[]hash` differ from `proof.targets`.
-- Get modified_roots from CalculateRoots(acc.numleaves, []hash, Proof).
-- Get root_idxs from *getrootidxs*.
-- Raise error if the length of modified_roots and root_idxs do not match.
+- Get modified_roots from `CalculateRoots(acc.numleaves, []hash, Proof)`.
+- Get `root_idxs` from `getrootidxs`.
+- Raise error if the length of `modified_roots` and `root_idxs` do not match.
 - Attempt to match roots in modified_roots with roots in `acc`. Raise error if we don't find all the roots in the modified_roots in `acc`.
+- Return `true`.
 
 The algorithm implemented in python:
 
 ```python
-def verify(self, dels: [bytes], proof: Proof):
+def verify(self, dels: [bytes], proof: Proof) -> bool:
     if len(dels) != len(proof.targets):
         raise("len of dels and proof.targets differ")
 
@@ -448,6 +446,8 @@ def verify(self, dels: [bytes], proof: Proof):
     for i, idx in enumerate(root_idxs):
         if self.roots[idx] != root_candidates[i]:
             raise("calculated roots from the proof and matched roots differ")
+
+    return true
 ```
 
 ## Deletion
@@ -459,11 +459,11 @@ verify that the proof is valid. It assumes that the passed in proof has already 
   - The accumulator state.
   - `proof`.
 
-The Deletion algorithm Delete(`acc`, `Proof`) -> `acc` is defined as:
+The Deletion algorithm `Delete(acc, Proof) -> acc` is defined as:
 
 - Get the modified indexes of the roots `root_idxes` from `getrootidxs`.
-- Get modified_roots from Calculate_Roots(acc.numleaves, []positions, Proof).
-- Replace the matching indexes from the root_idxes in `acc.roots` with modified_roots.
+- Get modified_roots from `Calculate_Roots(acc.numleaves, []positions, Proof)`.
+- Replace the matching indexes from the `root_idxes` in `acc.roots` with `modified_roots`.
 
 The algorithm implemented in python:
 
