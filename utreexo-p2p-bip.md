@@ -243,7 +243,7 @@ The TTL value provides information to determine which leaves should be cached an
 
 `MSG_UTREEXO_PROOF` is all the data required for a CSN or archive node using the Utreexo accumulators to validate a Bitcoin block.
 
-Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) is `29`.
+Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `29`.
 
 | Field                          | Type                         | Description                                                                                                                                 |
 |--------------------------------|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
@@ -265,7 +265,7 @@ While each leaf data represent a UTXO in a given block, not all are added as per
 
 `MSG_GET_UTREEXO_PROOF` is a message to request the inclusion proof for a given block.
 
-Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) is `30`.
+Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `30`.
 
 | Field                     | Type                        | Description                                                        |
 |---------------------------|-----------------------------|--------------------------------------------------------------------|
@@ -285,7 +285,7 @@ With these positions, we can set the bit in the bitmap for the hashes we require
 
 `MSG_UTREEXO_TTLS` is the requested group of Utreexo TTLs that includes the proof hashes needed to validate that the given TTLs were committed in the provided binary.
 
-Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) is `31`.
+Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `31`.
 
 | Field                      | Type                                | Description                                   |
 |----------------------------|-------------------------------------|-----------------------------------------------|
@@ -298,7 +298,7 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 
 `MSG_GET_UTREEXO_TTLS` is used to request a MSG_UTREEXO_TTLS message.
 
-Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) is `32`.
+Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `32`.
 
 | Field                | Type   | Description                                                                                                          |
 |----------------------|--------|----------------------------------------------------------------------------------------------------------------------|
@@ -310,7 +310,7 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 
 `MSG_UTREEXO_SUMMARY` is the data needed to calculate the missing merkle forest positions required to validate a given block.
 
-Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) is `33`.
+Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `33`.
 
 | Field                      | Type                    | Description                                                                                                      |
 |----------------------------|-------------------------|------------------------------------------------------------------------------------------------------------------|
@@ -323,7 +323,7 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 
 `MSG_UTREEXO_TX` is the current Bitcoin transaction appended with the inclusion proof.
 
-Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) is `34`.
+Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `34`.
 
 | Field                      | Type                         | Description                                                                                                                                                                                                      |
 |----------------------------|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -383,8 +383,10 @@ Used to indicate in a `getdata` message that a witness Utreexo tx is desired.
 ## Commitment scheme for TTL messages
 
 We choose an arbitrary height `X` and go through each of `TTL info` in all the the `Utreexo TTL` values up until that height.
+
 If the TTL in the `TTL info` is greater than the [numleaves](./utreexo-accumulator-bip.md#Definitions) value of the Utreexo accumulator at the chosen height `X`, we reset the `death position` and the `TTL` values to their default of 0.
 Then these `Utreexo TTL` values are hashed with the hash function SHA512/256[^2] and added in height order to the commitment Utreexo accumulator.
+
 Note that this commitment Utreexo accumulator is separate from the Utreexo accumulator being used to represent the UTXO set.
 
 The resulting [numleaves](./utreexo-accumulator-bip.md#Definitions) and [roots](./utreexo-accumulator-bip.md#Definitions) are committed into the distributed binary which then the nodes opting in can use to validate that the `Utreexo TTL` values received from peers was generated in the same way as the described commitment scheme.
