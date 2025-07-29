@@ -328,6 +328,8 @@ The resulting [numleaves](./utreexo-accumulator-bip.md#Definitions) and [roots](
 
 This BIP allocates two new service bits:
 
+| Field                | Type           | Description                                                                                                                         |
+|----------------------|----------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | NODE_UTREEXO         | 1 << 12 | Nodes that signal this bit MUST be able to propagate inclusion proofs for new blocks and transactions and for their other advertised services. Nodes signaling NODE_UTREEXO and NODE_NETWORK_LIMITED MUST serve inclusion proofs for the last 288 blocks. Nodes signaling NODE_UTREEXO and NODE_NETWORK MUST serve inclusion proofs for all historical blocks.
 | NODE_UTREEXO_ARCHIVE | 1 << 13 | Nodes that signal this bit MUST be able to serve historical inclusion proofs for all blocks. These nodes do not have to serve historical blocks.
 
