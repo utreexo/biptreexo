@@ -86,7 +86,7 @@ The node will have the block and the TTLs for the outputs of the given block whi
 We note that it is feasible for a node to receive incorrect TTL values from malicious nodes and this can negatively impact the bandwidth savings.
 Nodes can mitigate this by not downloading TTL values too far into the future or by checking if the `TTL` message received was included in the accumulator hard-coded into the binary.
 
-This TTL commitment scheme is described in detail [here](##Commitment scheme for TTL messages) .
+This TTL commitment scheme is described in detail [here](## Commitment scheme for TTL messages).
 
 ## Transaction relay
 
