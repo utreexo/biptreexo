@@ -86,7 +86,7 @@ The node will have the block and the TTLs for the outputs of the given block whi
 We note that it is feasible for a node to receive incorrect TTL values from malicious nodes and this can negatively impact the bandwidth savings.
 Nodes can mitigate this by not downloading TTL values too far into the future or by checking if the `TTL` message received was included in the accumulator hard-coded into the binary.
 
-This TTL commitment scheme is described in detail [here](## Commitment scheme for TTL messages).
+This TTL commitment scheme is described in detail [here](#Commitment scheme for TTL messages).
 
 ## Transaction relay
 
@@ -190,7 +190,7 @@ A compact leaf data is defined as:
 |--------------|------------------------------|-----------------|
 | header code  | uint32                       | This is a value obtained by left shifting the block height that confirmed this transaction, and then OR-ing it with 1, only if this transaction is a coinbase. |
 | amount       | int64                        | The amount in sats locked on this output |
-| scriptPubkey | reconstructable scriptPubkey | The scriptPubkey in a reconstructable format, see [Reconstructable Script](###Reconstructable-Script) for more details |
+| scriptPubkey | reconstructable scriptPubkey | The scriptPubkey in a reconstructable format, see [Reconstructable Script](#Reconstructable-Script) for more details |
 
 ### Reconstructable Script
 
@@ -258,10 +258,10 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 | leaf datas                     | vector of compact leaf datas | The preimage of the committed UTXOs requested by the MSG_GET_UTREEXO_PROOF. MUST be in blockchain order. See compact leaf data for details  |
 
 The proof hashes MUST be in merkle forest tree ordering.
-See BIP [Utreexo Accumulator Specification](##Positions in the forest) for an explanation on how each of the hashes in the merkle forest are positioned.
+See BIP [Utreexo Accumulator Specification](./utreexo-accumulator-bip.md#Merkle Forest) for an explanation on how each of the hashes in the merkle forest are positioned.
 
 Each of the target location represents the position of the leaf data at the same index.
-While each leaf data represent a UTXO in a given block, not all are added as per [Utreexo - Validation Layer](##Excluded UTXOs from the accumulator).
+While each leaf data represent a UTXO in a given block, not all are added as per [Utreexo - Validation Layer](./utreexo-validation-bip.md#Excluded UTXOs from the accumulator).
 
 ### MSG_GET_UTREEXO_PROOF
 
