@@ -606,6 +606,17 @@ In Rust - https://github.com/mit-dci/rustreexo
 
 In Go - https://github.com/utreexo/utreexo
 
+## Related Work
+
+[UHS: Full-node security without maintaining a full UTXO set](https://gnusha.org/pi/bitcoindev/CAApLimjfPKDxmiy_SHjuOKbfm6HumFPjc9EFKvw=3NwZO8JcmQ@mail.gmail.com/)
+[The TXO bitfield](https://gnusha.org/pi/bitcoindev/CA+KqGkpa0=O-ob6SsxST6bHwHu9hTnS16wnpNusrbc8nXVEouA@mail.gmail.com/)
+[AssumeUTXO](https://github.com/bitcoin/bitcoin/blob/master/doc/design/assumeutxo.md)
+
+## Acknowledgements
+
+We thank Pieter Wuille for originally discussing about the idea of an accumulator with a feasible bridge node for Bitcoin on the beaches of the Carribean with Tadge Dryja.
+We also thank BOB Spaces for lending the space to draft this BIP.
+
 ## References
 
 [^1]: Reyzin, Leonid, and Sophia Yakoubov. "Efficient asynchronous accumulators for distributed PKI." International Conference on Security and Cryptography for Networks. Cham: Springer International Publishing, 2016. https://eprint.iacr.org/2015/718
