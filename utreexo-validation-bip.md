@@ -334,6 +334,7 @@ not a soft-fork and does not require any changes to the existing Bitcoin
 
 ## Acknowledgements
 
+We thank BOB Spaces for lending the space to draft this BIP.
 
 ## References
 
