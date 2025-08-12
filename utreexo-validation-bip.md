@@ -10,7 +10,7 @@ Status: Draft
 Type: Specification
 Created: 2023-10-01
 License: BSD-3-Clause
-Depends: BIP-???? (Utreexo Accumulator Specification)
+Requires: BIP-???? (Utreexo Accumulator Specification)
 ```
 
 ## Abstract
@@ -22,21 +22,6 @@ the general rules for validating blocks and transactions using the Utreexo,
 so that all Utreexo nodes can stay in consensus with one another.
 
 ## Motivation
-
-The Bitcoin network is composed of a set of nodes that validate blocks and
-transactions as they are received. These nodes need to keep track of the current state of the network in order to
-fulfill their role. Most importantly, they must maintain a record of all coins that
-have been created but not yet spent—a collection known as the UTXO set.
-
-This set is typically stored in a database that must be accessed frequently and cannot
-be pruned. As a result, the cost of running a node is directly tied to the size
-of the UTXO set. Since it can grow indefinitely—bounded only by block size—it represents a
-long-term scalability concern.
-
-Utreexo is a dynamic accumulator that enables the UTXO set to be represented in just a few kilobytes,
-by requiring peers to provide additional proof data to verify the inclusion of a UTXO in the
-accumulator. This allows for the construction of extremely lightweight nodes capable of performing
-the same validation as a full node, without the need to store the entire UTXO set.
 
 Although Utreexo in its current form is not proposed as a soft fork, it is essential that
 all implementations adhere to a consistent workflow when performing consensus-critical
@@ -223,7 +208,7 @@ BIP-????.
 The UTXO proof has 2 elements: the accumulator proof and the leaf data. The
 leaf data provides the necessary UTXO data for block validation that would be
 stored locally for non-Utreexo nodes. The accumulator proof proves that the
-given UTXO hash preimages are commited in the accumulator.
+given UTXO hash preimages are committed in the accumulator.
 
 Accumulator proof is defined in BIP-????, and contains two elements:
 
@@ -325,12 +310,13 @@ UTXO created at block height 91,812.
 ## Reference Implementation
 
 [Utreexod](https://github.com/utreexo/utreexod): A full node implementation with Utreexo support, written in Golang.
+
 [Floresta](https://github.com/vinteumorg/floresta): A lightweight Utreexo client, written in Rust.
 
 ## Backward Compatibility
 
-Utreexo is a new data structure and adds to the existing Bitcoin protocol. It is
-not a soft-fork and does not require any changes to the existing Bitcoin
+Utreexo nodes are fully backwards compatible with current nodes as they will follow the same chain tip as the current nodes.
+Similarly, Utreexo nodes will only consider currently valid transactions for mempool acceptance.
 
 ## Acknowledgements
 
