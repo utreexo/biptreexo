@@ -10,7 +10,6 @@ Status: Draft
 Type: Specification
 Created: 2025-06-18
 License: BSD-3-Clause
-Depends: BIP-???? (Utreexo Accumulator Specification)
 ```
 
 ## Abstract
@@ -23,11 +22,11 @@ accumulator as well as how to generate and verify inclusion proofs for elements 
 The Bitcoin network is composed of a set of nodes that validate blocks and
 transactions as they are received. These nodes need to keep track of the current state of the network in order to
 fulfill their role. Most importantly, they must maintain a record of all coins that
-have been created but not yet spent—a collection known as the UTXO set.
+have been created but not yet spent, a collection known as the UTXO set.
 
 This set is typically stored in a database that must be accessed frequently and cannot
 be pruned. As a result, the cost of running a node is directly tied to the size
-of the UTXO set. Since it can grow indefinitely—bounded only by block size—it represents a
+of the UTXO set. Since it can grow indefinitely, bounded only by block size, it represents a
 long-term scalability concern.
 
 Utreexo is a dynamic accumulator that enables the UTXO set to be represented in just a few kilobytes,
@@ -53,7 +52,7 @@ the accumulator tracks the current set of unspent transaction outputs (UTXOs).
 The Utreexo accumulator is based on an append-only Merkle tree design introduced in [^1],
 which provides logarithmic-sized inclusion proofs. Utreexo extends this design to support dynamic updates,
 specifically enabling deletions from the set—a requirement for tracking UTXO spends in Bitcoin.
-To accommodate this, Utreexo increases the storage requirement for the accumulator state to O(log₂(N)),
+To accommodate this, Utreexo changes the storage requirement from the accumulator design in [^1] to $O(log_2(N))$,
 where N is the number of elements ever added to the set, while still keeping proof sizes small and verification efficient.
 
 ## Merkle Forest
@@ -63,7 +62,7 @@ where each node in the tree contains a 32-byte hash. The elements being stored a
 The topmost node is referred to as the "root," while nodes located between the leaves and the root are called "intermediate nodes."
 
 Any integer number of elements ($N$) can be represented as a forest of such trees. On average, a set of N elements will require
-approximately $\frac{log₂(N)}{2}$ trees. The number and sizes of trees are determined by the binary representation of $N$:
+approximately $\frac{log_2(N)}{2}$ trees. The number and sizes of trees are determined by the binary representation of $N$:
 each 1-bit corresponds to a tree, and its position in the binary encoding determines the size of that tree.
 
 For example, a forest with 5 elements (binary `0b101`) would consist of two trees: one with 4 elements (representing the 2nd bit)
@@ -606,15 +605,21 @@ In Rust - https://github.com/mit-dci/rustreexo
 
 In Go - https://github.com/utreexo/utreexo
 
+## Backward Compatibility
+
+The Utreexo accumulator is a new data structure to the existing Bitcoin protocol and does not pose any backwards compatibility issues.
+
 ## Related Work
 
 [UHS: Full-node security without maintaining a full UTXO set](https://gnusha.org/pi/bitcoindev/CAApLimjfPKDxmiy_SHjuOKbfm6HumFPjc9EFKvw=3NwZO8JcmQ@mail.gmail.com/)
+
 [The TXO bitfield](https://gnusha.org/pi/bitcoindev/CA+KqGkpa0=O-ob6SsxST6bHwHu9hTnS16wnpNusrbc8nXVEouA@mail.gmail.com/)
+
 [AssumeUTXO](https://github.com/bitcoin/bitcoin/blob/master/doc/design/assumeutxo.md)
 
 ## Acknowledgements
 
-We thank Pieter Wuille for originally discussing about the idea of an accumulator with a feasible bridge node for Bitcoin on the beaches of the Carribean with Tadge Dryja.
+We thank Pieter Wuille for originally discussing about the idea of an accumulator with a feasible bridge node for Bitcoin on the beaches of the Caribbean with Tadge Dryja.
 We also thank BOB Spaces for lending the space to draft this BIP.
 
 ## References

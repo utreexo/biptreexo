@@ -10,7 +10,7 @@ Status: Draft
 Type: Specification
 Created: 2024-08-08
 License: BSD-3-Clause
-Depends: BIP-???? (Utreexo - Peer Services)
+Requires: <BIP-???? (Utreexo Accumulator Specification), BIP-???? (Utreexo - Validation Layer)>
 ```
 
 ## Abstract
@@ -23,8 +23,8 @@ This document **does not** describe how to validate blocks and transactions usin
 ## Motivation
 
 Utreexo nodes require the inclusion proof to fully validate blocks and transactions.
-Each block has an corresponding inclusion proof with it and this inclusion proof for blocks up to height 906,937 requires an additional 631.85GB, which is roughly 40GB less than the size of the block data.
-Each transaction also has an corresponding inclusion proof with it and for normal transaction relay, the proof is roughly 3 times the size of the transaction.
+Each block has a corresponding inclusion proof with it and this inclusion proof for blocks up to height 906,937 requires an additional 631.85GB, which is roughly 40GB less than the size of the block data.
+Each transaction also has a corresponding inclusion proof with it and for normal transaction relay, the proof is roughly 3 times the size of the transaction.
 It's still reasonable for a single node to download this extra data but little caching goes a long way in reducing the amount of data that one has to download.
 We define the new P2P messages for the inclusion proofs to support caching to reduce bandwidth while also allowing a high bandwidth, low-latency usage.
 
@@ -47,7 +47,7 @@ That said, there are three likely types of nodes:
 CSNs have the goal of minimizing data storage and download while performing block validation.
 Archive and bridge nodes store more data and provide this data to CSNs.
 
-Bridge nodes are nodes that can add inclusion proofs to mempool transactions, support the same set of messages as CSNs, and are in fact should be indistinguishable from CSNs on the network.
+Bridge nodes are nodes that can add inclusion proofs to mempool transactions, support the same set of messages as CSNs, and should in fact be indistinguishable from CSNs on the network.
 Archive nodes are able to serve the blocks and the inclusion proofs. However, they are not able to generate the inclusion proofs as they do not keep the full UTXO set.
 
 Note that the archive and bridge capabilities of a node are separate; a bridge node can be bridge only, without previous block proof data, and an archive node doesn't need to be able to bridge.
@@ -66,20 +66,20 @@ Once an archive and bridge node have been established, CSNs download blocks and 
 
 ### Initial Block Download
 
-![Current IBD](images/current-ibd.png)
+![Current IBD](bip-utreexo-p2p/current-ibd.png)
 
 Current IBD is done by a headers-first block download, in which the node downloads all the Bitcoin block headers, verifies that they connect, and start downloading the actual block data for validation.
 
-![Utreexo node IBD](images/utreexo-node-ibd.png)
+![Utreexo node IBD](bip-utreexo-p2p/utreexo-node-ibd.png)
 
 Utreexo nodes still perform the headers-first phase.
 However, in addition to blocks, they also require the inclusion proof for UTXOs spent in that block.
 Hence a Utreexo node will send a `getutreexoproof` message along with the `getdata` message for a given block.
 This flow is the simplest change and allows a Utreexo node to validate and perform IBD but this method does require downloading about 2 times compared to the current nodes as the inclusion proof for a block is roughly the same size as the block itself.
 
-![Bandwidth efficient Utreexo node IBD](images/bandwidth-efficient-utreexo-node-ibd.png)
+![Bandwidth efficient Utreexo node IBD](bip-utreexo-p2p/bandwidth-efficient-utreexo-node-ibd.png)
 
-For Utreexo nodes with memory to spare, we introduce a `TTL` messsage that will have a time-to-live value for each of the outputs in a given block.
+For Utreexo nodes with memory to spare, we introduce a `TTL` message that will have a time-to-live value for each of the outputs in a given block.
 
 With these TTL values, a node receiving the `TTL` message will be able to determine which output to cache with the Clairvoyant algorithm[^1] which allows the IBD-ing node to reduce the bandwidth required in syncing the node in the most efficient way possible.
 
@@ -92,17 +92,17 @@ This TTL commitment scheme is described in detail [here](#Commitment scheme for 
 
 ### Transaction relay
 
-![Current TX relay](images/current-tx-relay.png)
+![Current TX relay](bip-utreexo-p2p/current-tx-relay.png)
 
 Current transaction relay is done by sending an inv message with the hash of the transaction and a type field that denotes that this hash represents a transaction.
-If the node receiving the inv is does not have a tx matching that hash, it then requests for it using a getdata message.
+If the node receiving the inv does not have a tx matching that hash, it then requests for it using a getdata message.
 
-![Utreexo TX relay](images/utreexo-tx-relay.png)
+![Utreexo TX relay](bip-utreexo-p2p/utreexo-tx-relay.png)
 
 The transaction relay for Utreexo nodes doesn't add any extra round trips.
 However, it does include extra inventory vectors in the inv message.
 
-We introduce a new inventory vector type called `utreexoproofhash` which make up the extra information that a Utreexo node will receive.
+We introduce a new inventory vector type called `utreexoproofhash`, which makes up the extra information that a Utreexo node will receive.
 
 A hash with the type `utreexoproofhash` represents 4 Utreexo merkle tree positions, each of them little endian serialized and taking up 8 bytes in the 32 byte hash.
 When sending an inv message to a Utreexo node for a tx, we append `utreexoproofhash` inventory vectors to represent the merkle tree positions for each of the UTXOs being referenced in the inputs of the tx.
@@ -112,21 +112,21 @@ Since the hash in an inventory vector is always 32 bytes, any unused space will 
 With these merkle tree positions for the UTXOs referenced in the inputs, we can calculate the needed positions of the merkle hashes to them.
 These positions are then sent over in the `getdata` message as an another inventory vector.
 
-![Utreexo TX relay multiple Utreexo proof hash vectors](images/utreexo-tx-relay-multiple-proofhash-vectors.png)
+![Utreexo TX relay multiple Utreexo proof hash vectors](bip-utreexo-p2p/utreexo-tx-relay-multiple-proofhash-vectors.png)
 
 There may be cases where the transaction is referencing more than 4 merkle positions.
 In this case, the extra positions are added as another inventory vector.
 There can be as many additional inventory vectors for the `utreexoproofhash`es as needed.
 An inventory vector of type `utreexoproofhash` will be ignored if it's not prepended with an inventory vector of type `transaction`.
 
-![Utreexo TX relay with multiple txs](images/utreexo-tx-relay-with-multiple-txs.png)
+![Utreexo TX relay with multiple txs](bip-utreexo-p2p/utreexo-tx-relay-with-multiple-txs.png)
 
 It's possible to have an inv message with multiple txs as well.
 Note that an inventory vector of type `utreexoproofhash` MUST be appended to the `tx` inventory vector.
 
 ### Block Propagation
 
-![Legacy Block Propagation](images/legacy-block-propagation.png)
+![Legacy Block Propagation](bip-utreexo-p2p/legacy-block-propagation.png)
 
 Legacy block propagation without Compact Blocks comprises of three steps:
 
@@ -134,7 +134,7 @@ Legacy block propagation without Compact Blocks comprises of three steps:
 2. Node B makes a getdata request for the block.
 3. Node A sends the block data to Node B.
 
-![Legacy Block Propagation with Utreexo Nodes](images/legacy-block-propagation-with-utreexo-nodes.png)
+![Legacy Block Propagation with Utreexo Nodes](bip-utreexo-p2p/legacy-block-propagation-with-utreexo-nodes.png)
 
 The same block propagation with Utreexo nodes will look like so:
 
@@ -151,7 +151,7 @@ Since there's no PoW required for the inclusion proof, the block may be valid an
 If the block header validation passed while the full block validation fails, Node B should request the inclusion proof from a different peer.
 If the new proof and the block pass validation, we can conclude that Node A is malicious and ban the peer.
 
-![Bandwidth Saving Legacy Block Propagation with Utreexo Nodes](images/bandwith-saving-legacy-block-propagation-with-utreexo-nodes.png)
+![Bandwidth Saving Legacy Block Propagation with Utreexo Nodes](bip-utreexo-p2p/bandwidth-saving-legacy-block-propagation-with-utreexo-nodes.png)
 
 Since the inclusion proof is cached for each of the transaction in the mempool, it's possible to omit the proof hashes for the input UTXOs that we can already prove on our own.
 This method looks like so:
@@ -209,7 +209,7 @@ The serialization and tag values are given below:
 
 | Field   | Type                    | Description       | Required                 |
 |---------|-------------------------|-------------------|--------------------------|
-| tag     | 1-byte unsigend integer | Script type       | yes                      |
+| tag     | 1-byte unsigned integer | Script type       | yes                      |
 | length  | varint                  | The script length | only if tag type is 0x00 |
 | script  | variable-length vector  | The actual script | only if tag type is 0x00 |
 
@@ -235,11 +235,11 @@ The TTL value provides information to determine which leaves should be cached an
 
 #### Utreexo TTL
 
-| Field        | Type                | Description                                                                                                                                                          |
-|--------------|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| block height | uint32              | The time-to-live value of a leaf in the Utreexo merkle forest. The value is determined by the amount of leaves that were added to the accumulator since its creation |
-| length       | varint              | The length of the TTLs                                                                                                                                               |
-| TTLs         | vector of TTL infos | position in the Utreexo merkle forest when the leaf was removed                                                                                                      |
+| Field        | Type                | Description                                                                                                                                                                                                                                                    |
+|--------------|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| block height | uint32              | The time-to-live value of a leaf in the Utreexo merkle forest. The value is determined by the amount of leaves that were added to the accumulator since its creation                                                                                           |
+| length       | varint              | The length of the TTLs                                                                                                                                                                                                                                         |
+| TTLs         | vector of TTL infos | The TTL Info for the UTXOs that are added to the Utreexo merkle forest in blockchain ordering. See [Utreexo - Validation Layer](./utreexo-validation-bip.md#Excluded UTXOs from the accumulator) for the UTXOs that are not added to the Utreexo merkle forest |
 
 ### New Messages
 
@@ -250,15 +250,15 @@ The TTL value provides information to determine which leaves should be cached an
 Its `cmdString` for P2PV1 is `uproof`.
 Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `29`.
 
-| Field                          | Type                         | Description                                                                                                                                 |
-|--------------------------------|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
-| blockhash                      | 32 byte vector               | The hash of the block that this inclusion proof proves                                                                                      |
-| length of the proof hashes     | varint                       | The length of the proof hashes                                                                                                              |
-| proof hashes                   | vector of 32 byte vectors    | The hashes requested by MSG_GET_UTREEXO_PROOF. MUST be in tree order                                                                        |
-| length of the target locations | varint                       | The length of the target locations                                                                                                          |
-| target locations               | vector of varint values      | The Utreexo merkle tree locations of the leaf datas. MUST be in blockchain order. MUST include all the locations or none of the locations   |
-| length of the leaf datas       | varint                       | The length of the leaf datas                                                                                                                |
-| leaf datas                     | vector of compact leaf datas | The preimage of the committed UTXOs requested by the MSG_GET_UTREEXO_PROOF. MUST be in blockchain order. See compact leaf data for details  |
+| Field                          | Type                         | Description                                                                                                                                |
+|--------------------------------|------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| blockhash                      | 32 byte vector               | The hash of the block that this inclusion proof proves                                                                                     |
+| length of the proof hashes     | varint                       | The length of the proof hashes                                                                                                             |
+| proof hashes                   | vector of 32 byte vectors    | The hashes requested by MSG_GET_UTREEXO_PROOF. MUST be in tree order                                                                       |
+| length of the target locations | varint                       | The length of the target locations                                                                                                         |
+| target locations               | vector of varint values      | The Utreexo merkle tree locations of the leafdatas. MUST be in blockchain order. MUST include all the locations or none of the locations   |
+| length of the leafdatas        | varint                       | The length of the leafdatas                                                                                                                |
+| leafdatas                      | vector of compact leafdatas  | The preimage of the committed UTXOs requested by the MSG_GET_UTREEXO_PROOF. MUST be in blockchain order. See compact leaf data for details |
 
 The proof hashes MUST be in merkle forest tree ordering.
 See BIP [Utreexo Accumulator Specification](./utreexo-accumulator-bip.md#Merkle Forest) for an explanation on how each of the hashes in the merkle forest are positioned.
@@ -278,11 +278,11 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 | blockhash                 | 32 byte vector              | The hash of the bitcoin block that we want the inclusion proof for |
 | include all               | boolean                     | A boolean value to request all parts of the inclusion proof        |
 | proof request bitmap      | variable-length byte vector | A bitmap of the requested proof hashes                             |
-| leaf data request bitmap  | variable-length byte vector | A bitmap of the requested leaf datas                               |
+| leaf data request bitmap  | variable-length byte vector | A bitmap of the requested leafdatas                                |
 
 The bitmaps here are formatted as big-endian and padded to the nearest byte, with 1 meaning a request for the proof hash or the leaf data, and 0 meaning omit the proof hash or the leaf data.
 
-Since there's one corresponding leaf data per target location, it's trivial to generate a bitmap for the leaf datas.
+Since there's one corresponding leaf data per target location, it's trivial to generate a bitmap for the leafdatas.
 
 Using the [proof_positions](./utreexo-accumulator-bip.md#Utility Functions) function, it's possible to generate the positions of the needed proof hashes for a given set of targets.
 With these positions, we can set the bit in the bitmap for the hashes we require.
@@ -299,7 +299,7 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 | length of the Utreexo TTLs | varint                              | The length of the Utreexo summaries           |
 | Utreexo TTLs               | vector of Utreexo summaries         | The vector of the requested Utreexo summaries |
 | length of the proof hashes | varint                              | The length of the proof hashes                |
-| proof hashes               | vector of 32 byte hashes            | The vector of the requested Utreexo summaries |
+| proof hashes               | vector of 32 byte hashes            | The vector of the requested proof hashes      |
 
 #### MSG_GET_UTREEXO_TTLS
 
@@ -321,12 +321,12 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 Its `cmdString` for P2PV1 is `usummary`.
 Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `33`.
 
-| Field                      | Type                    | Description                                                                                                      |
-|----------------------------|-------------------------|------------------------------------------------------------------------------------------------------------------|
-| blockhash                  | 32 byte vector          | The hash of the block that this Utreexo block summary is for                                                     |
-| num adds                   | varint                  | The count of leaves added to the accumulator on the block this Utreexo block summary is for                      |
-| length of target locations | varint                  | The length of the target locations                                                                               |
-| target locations           | vector of uint64 values | The Utreexo merkle tree locations of the leaf datas. MUST be in blockchain order. MUST include all the locations |
+| Field                      | Type                    | Description                                                                                                     |
+|----------------------------|-------------------------|-----------------------------------------------------------------------------------------------------------------|
+| blockhash                  | 32 byte vector          | The hash of the block that this Utreexo block summary is for                                                    |
+| num adds                   | varint                  | The count of leaves added to the accumulator on the block this Utreexo block summary is for                     |
+| length of target locations | varint                  | The length of the target locations                                                                              |
+| target locations           | vector of uint64 values | The Utreexo merkle tree locations of the leafdatas. MUST be in blockchain order. MUST include all the locations |
 
 #### MSG_UTREEXO_TX
 
@@ -335,13 +335,13 @@ Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawik
 Its `cmdString` for P2PV1 is `utreexotx`.
 Its [BIP324 P2PV2](https://github.com/bitcoin/bips/blob/master/bip-0324.mediawiki#user-content-v2_Bitcoin_P2P_message_structure) message type is `34`.
 
-| Field                      | Type                         | Description                                                                                                                                                                                                      |
-|----------------------------|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| transaction                | MSG_TX                       | The bitcoin transaction. Unconfirmed inputs are marked by shifting the index by 1 and setting the LSB                                                                                                            |
-| length of the proof hashes | varint                       | The length of the proof hashes                                                                                                                                                                                   |
-| proof hashes               | vector of 32 byte hashes     | The vector of the requested Utreexo summaries                                                                                                                                                                    |
-| length of the leaf datas   | varint                       | The length of the leaf datas                                                                                                                                                                                     |
-| leaf datas                 | vector of compact leaf datas | The preimage of the leaf datas referenced in the bitcoin transaction. MUST be in the order of the referenced inputs. Unconfirmed inputs do not have a corresponding leaf data. See compact leaf data for details |
+| Field                      | Type                         | Description                                                                                                                                                                                                     |
+|----------------------------|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| transaction                | MSG_TX                       | The bitcoin transaction. Unconfirmed inputs are marked by shifting the index by 1 and setting the LSB                                                                                                           |
+| length of the proof hashes | varint                       | The length of the proof hashes                                                                                                                                                                                  |
+| proof hashes               | vector of 32 byte hashes     | The vector of the requested Utreexo summaries                                                                                                                                                                   |
+| length of the leafdatas    | varint                       | The length of the leafdatas                                                                                                                                                                                     |
+| leafdatas                  | vector of compact leafdatas  | The preimage of the leafdatas referenced in the bitcoin transaction. MUST be in the order of the referenced inputs. Unconfirmed inputs do not have a corresponding leaf data. See compact leaf data for details |
 
 For each of the referenced inputs in the Bitcoin transaction, we mark each unconfirmed UTXO by setting the index of its outpoint:
 
@@ -409,7 +409,7 @@ Defined as `6`.
 - It's used in the `inv` and `getdata` messages to communicate positions in the Utreexo merkle forest.
 - The communicated positions MUST be in order of the referenced UTXO in the inputs.
 - Unconfirmed UTXOs for the given transaction will NOT have a position associated with it.
-- MUST be appened to another `invvect` of type `MSG_TX`, `MSG_WITNESS_TX`, `MSG_UTREEXO_TX`, or a `MSG_WITNESS_UTREEXO_TX`.
+- MUST be appended to another `invvect` of type `MSG_TX`, `MSG_WITNESS_TX`, `MSG_UTREEXO_TX`, or a `MSG_WITNESS_UTREEXO_TX`.
 - Ignored if an `invvect` of type `MSG_UTREEXO_PROOF_HASH` is not pre-pended by any of the above 4 `invvect` types.
 
 #### MSG_UTREEXO_SUMMARY
@@ -465,7 +465,7 @@ Example cases:
 
 | Used Service bits                                |  Description                                                                                                                         |
 |------------------------------------------------- |--------------------------------------------------------------------------------------------------------------------------------------|
-| NODE_NETWORK, NODE_UTREEXO_ARCHIVE, NODE_UTREEXO | Historial blocks + inclusion proofs for historical blocks + inclusion proofs for txs and new blocks                                  |  
+| NODE_NETWORK, NODE_UTREEXO_ARCHIVE, NODE_UTREEXO | Historical blocks + inclusion proofs for historical blocks + inclusion proofs for txs and new blocks                                 |  
 | NODE_NETWORK_LIMITED, NODE_UTREEXO               | Latest 288 blocks + inclusion proofs for latest 288 blocks + inclusion proofs for txs and new blocks                                 |
 | NODE_UTREEXO                                     | Inclusion proofs for txs and new blocks                                                                                              |
 | NODE_UTREEXO_ARCHIVE                             | Inclusion proofs for historical blocks                                                                                               |
